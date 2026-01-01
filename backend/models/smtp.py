@@ -18,9 +18,16 @@ class SMTPServer(db.Model):
     username = db.Column(db.String(255), nullable=False)
     password_encrypted = db.Column(db.Text, nullable=False)
     status = db.Column(db.String(20), default='active')  # 'active', 'failed', 'disabled'
-    failure_count = db.Column(db.Integer, default=0)
-    success_count = db.Column(db.Integer, default=0)
+    
+    # Failure tracking (for auto-disable)
+    failures = db.Column(db.Integer, default=0)  # Total failures
+    successes = db.Column(db.Integer, default=0)  # Total successes
+    failure_count = db.Column(db.Integer, default=0)  # Legacy field
+    success_count = db.Column(db.Integer, default=0)  # Legacy field
+    
     last_used = db.Column(db.DateTime)
+    last_error = db.Column(db.Text)  # Last error message
+    last_error_at = db.Column(db.DateTime)  # When last error occurred
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     def set_password(self, password):

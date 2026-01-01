@@ -1,0 +1,11 @@
+{
+  "smtp_servers": [],
+  "recipients": [],
+  "from_addresses": [],
+  "config": {
+    "threads": 10,
+    "sleep_interval": 1.0,
+    "test_mode": false
+  },
+  "note": "This is an empty config file - large data removed for GitHub"
+}

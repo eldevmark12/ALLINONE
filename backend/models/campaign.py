@@ -15,6 +15,24 @@ class Campaign(db.Model):
     name = db.Column(db.String(255), nullable=False)
     campaign_type = db.Column(db.String(20), nullable=False)  # 'test_froms' or 'bulk_sending'
     status = db.Column(db.String(20), default='pending')  # 'pending', 'running', 'paused', 'completed', 'failed'
+    
+    # Celery background task fields
+    celery_task_id = db.Column(db.String(50))  # Celery task ID for background processing
+    error = db.Column(db.Text)  # Error message if failed
+    
+    # Campaign configuration
+    template = db.Column(db.Text)  # HTML email template
+    subject = db.Column(db.String(500))  # Email subject
+    sleep_interval = db.Column(db.Float, default=1.0)  # Delay between emails (seconds)
+    
+    # SMTP rotation state (for thread-safe rotation)
+    smtp_index = db.Column(db.Integer, default=0)  # Current SMTP index
+    from_index = db.Column(db.Integer, default=0)  # Current FROM address index
+    
+    # Statistics
+    emails_sent = db.Column(db.Integer, default=0)
+    emails_failed = db.Column(db.Integer, default=0)
+    
     total_recipients = db.Column(db.Integer, default=0)
     sent_count = db.Column(db.Integer, default=0)
     failed_count = db.Column(db.Integer, default=0)
@@ -23,12 +41,15 @@ class Campaign(db.Model):
     retry_count = db.Column(db.Integer, default=5)
     template_id = db.Column(db.String(36), db.ForeignKey('email_templates.id'))
     started_at = db.Column(db.DateTime)
+    stopped_at = db.Column(db.DateTime)
     completed_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     
     # Relationships
     recipients = db.relationship('Recipient', backref='campaign', lazy='dynamic', cascade='all, delete-orphan')
     logs = db.relationship('EmailLog', backref='campaign', lazy='dynamic', cascade='all, delete-orphan')
+    smtp_servers = db.relationship('SMTPServer', secondary='campaign_smtps', lazy='dynamic')
+    from_addresses = db.relationship('FromAddress', secondary='campaign_froms', lazy='dynamic')
     
     def to_dict(self):
         """Convert to dictionary"""
