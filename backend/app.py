@@ -18,7 +18,7 @@ import threading
 
 
 # Initialize extensions
-socketio = SocketIO(cors_allowed_origins="*", async_mode='eventlet')
+socketio = SocketIO(cors_allowed_origins="*", async_mode='threading')
 jwt = JWTManager()
 
 
