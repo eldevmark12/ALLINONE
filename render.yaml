@@ -11,7 +11,7 @@ services:
     plan: starter
     branch: main
     buildCommand: "pip install -r backend/requirements.txt"
-    startCommand: "bash start_web.sh"
+    startCommand: "bash ./start_web.sh"
     healthCheckPath: /health
     envVars:
       - key: PYTHONPATH
@@ -59,7 +59,7 @@ services:
     plan: starter
     branch: main
     buildCommand: "pip install -r backend/requirements.txt"
-    startCommand: "bash start_worker.sh"
+    startCommand: "bash ./start_worker.sh"
     envVars:
       - key: PYTHONPATH
         value: /opt/render/project/src/backend
