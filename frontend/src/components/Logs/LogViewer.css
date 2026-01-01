@@ -1,0 +1,35 @@
+.log-viewer {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 13px;
+  padding: 16px;
+  overflow-y: auto;
+  border-radius: 4px;
+}
+
+.log-entry {
+  margin-bottom: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid #2d2d2d;
+}
+
+.log-tag {
+  margin-right: 8px;
+  font-weight: bold;
+}
+
+.log-timestamp {
+  color: #858585;
+  margin-right: 12px;
+}
+
+.log-message {
+  color: #d4d4d4;
+}
+
+.log-empty {
+  text-align: center;
+  color: #858585;
+  padding: 40px;
+}
