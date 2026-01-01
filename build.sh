@@ -1,28 +1,42 @@
 #!/bin/bash
 
-echo "Starting build process..."
+set -e  # Exit on error
+
+echo "===== Starting build process ====="
+echo "Current directory: $(pwd)"
 
 # Install Python dependencies
-echo "Installing Python dependencies..."
+echo "===== Installing Python dependencies ====="
 pip install -r requirements.txt
 
 # Install backend Node.js dependencies
-echo "Installing backend dependencies..."
+echo "===== Installing backend dependencies ====="
 cd backend
 npm install
 cd ..
 
 # Install frontend dependencies and build
-echo "Installing frontend dependencies..."
+echo "===== Installing frontend dependencies ====="
 cd frontend
+
+# Check Node version
+echo "Node version: $(node --version)"
+echo "NPM version: $(npm --version)"
+
 npm install
 
-echo "Building React frontend..."
-npm run build
+echo "===== Building React frontend ====="
+CI=false npm run build
 
-echo "Build complete! Checking build folder..."
-ls -la build/
+if [ -d "build" ]; then
+    echo "✅ Build folder created successfully!"
+    echo "Build folder contents:"
+    ls -la build/
+else
+    echo "❌ ERROR: Build folder not created!"
+    exit 1
+fi
 
 cd ..
 
-echo "Build process finished!"
+echo "===== Build process finished! ====="

@@ -73,14 +73,42 @@ app.get('/api/health', (req, res) => {
 if (process.env.NODE_ENV === 'production') {
   const frontendPath = path.join(__dirname, '../../../frontend/build');
   
+  console.log('=== Frontend Configuration ===');
+  console.log('NODE_ENV:', process.env.NODE_ENV);
   console.log('Frontend path:', frontendPath);
+  console.log('__dirname:', __dirname);
+  
+  // Check if build folder exists
+  const fs = require('fs');
+  if (fs.existsSync(frontendPath)) {
+    console.log('✅ Frontend build folder exists');
+    console.log('Contents:', fs.readdirSync(frontendPath));
+  } else {
+    console.error('❌ Frontend build folder NOT found at:', frontendPath);
+    console.log('Trying alternative path...');
+    const altPath = path.join(__dirname, '../../frontend/build');
+    console.log('Alternative path:', altPath);
+    if (fs.existsSync(altPath)) {
+      console.log('✅ Found at alternative path!');
+    }
+  }
   
   // Serve static files
   app.use(express.static(frontendPath));
   
   // Handle React routing - return index.html for all non-API routes
   app.get('*', (req, res) => {
-    res.sendFile(path.join(frontendPath, 'index.html'));
+    const indexPath = path.join(frontendPath, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      res.status(500).json({ 
+        success: false, 
+        error: `Frontend not built. Looking for: ${indexPath}`,
+        buildPath: frontendPath,
+        exists: fs.existsSync(frontendPath)
+      });
+    }
   });
 } else {
   // Development - API info
