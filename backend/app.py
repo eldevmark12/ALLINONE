@@ -1,7 +1,7 @@
 """
 Main Flask Application with WebSocket Support
 """
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, verify_jwt_in_request, get_jwt_identity
 from flask_socketio import SocketIO, emit, join_room, leave_room
@@ -111,9 +111,15 @@ def create_app(config_name=None):
     def health():
         return jsonify({'status': 'healthy', 'service': 'ALL-in-One Email Platform'}), 200
     
-    # Root endpoint
+    # Root endpoint - Serve frontend or API info
     @app.route('/')
     def index():
+        # Check if frontend build exists
+        frontend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'dist', 'index.html')
+        if os.path.exists(frontend_path):
+            return send_from_directory(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'dist'), 'index.html')
+        
+        # Otherwise return API info
         return jsonify({
             'service': 'ALL-in-One Email Platform API',
             'version': '1.0.0',
@@ -128,6 +134,17 @@ def create_app(config_name=None):
                 'stats': '/api/stats'
             }
         }), 200
+    
+    # Serve static files from frontend build
+    @app.route('/<path:path>')
+    def serve_static(path):
+        frontend_dist = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'dist')
+        if os.path.exists(os.path.join(frontend_dist, path)):
+            return send_from_directory(frontend_dist, path)
+        # If file doesn't exist, return index.html for client-side routing
+        if os.path.exists(os.path.join(frontend_dist, 'index.html')):
+            return send_from_directory(frontend_dist, 'index.html')
+        return jsonify({'error': 'Not found'}), 404
     
     return app
 

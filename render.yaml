@@ -2,7 +2,7 @@
 # ALL-in-One Email Management Platform - PRODUCTION READY
 
 services:
-  # Web Service (Flask API + WebSocket)
+  # Web Service (Flask API + WebSocket + Frontend)
   - type: web
     name: allinone-email-platform
     env: python
@@ -10,7 +10,7 @@ services:
     region: oregon
     plan: starter
     branch: main
-    buildCommand: "pip install -r backend/requirements.txt"
+    buildCommand: "npm install --prefix frontend && npm run build --prefix frontend && pip install -r backend/requirements.txt"
     startCommand: "bash ./start_web.sh"
     healthCheckPath: /health
     envVars:
@@ -84,29 +84,6 @@ services:
         value: "3"
       - key: DEFAULT_RETRY_COUNT
         value: "5"
-
-  # Frontend Static Site (React)
-  - type: web
-    name: allinone-frontend
-    env: static
-    region: oregon
-    branch: main
-    buildCommand: "cd frontend && npm install && npm run build"
-    staticPublishPath: ./frontend/dist
-    headers:
-      - path: /*
-        name: X-Frame-Options
-        value: SAMEORIGIN
-      - path: /*
-        name: X-Content-Type-Options
-        value: nosniff
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
-    envVars:
-      - key: VITE_API_URL
-        value: https://all-in-one-tdxd.onrender.com
 
 databases:
   # PostgreSQL Database
