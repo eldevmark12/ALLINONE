@@ -1,5 +1,5 @@
 colorama
 pyfiglet
 gdshortener
-dkim
+dkimpy
 socks
