@@ -5,167 +5,694 @@
 {% block content %}
 <div class="row">
     <div class="col-12 mb-4">
-        <h1><i class="bi bi-send-fill"></i> Monitored From Emails</h1>
-        <p class="text-muted">Real-time email monitoring from external accounts</p>
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1><i class="bi bi-send-fill"></i> Sending Campaign</h1>
+                <p class="text-muted">Send emails using monitored from addresses</p>
+            </div>
+            <div>
+                <span id="sendingStatusBadge" class="badge bg-secondary fs-6">
+                    <i class="bi bi-stop-circle"></i> Stopped
+                </span>
+            </div>
+        </div>
     </div>
 </div>
 
 <!-- Statistics Cards -->
 <div class="row mb-4">
     <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-check-circle"></i> Active Froms</h5>
+                <h2 class="mb-0" id="activeFromsCount">0</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-secondary text-white">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-x-circle"></i> Inactive Froms</h5>
+                <h2 class="mb-0" id="inactiveFromsCount">0</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
         <div class="card bg-info text-white">
             <div class="card-body">
-                <h5 class="card-title"><i class="bi bi-server"></i> Accounts</h5>
-                <h2 class="mb-0" id="monitoredAccounts">0</h2>
+                <h5 class="card-title"><i class="bi bi-people-fill"></i> Recipients</h5>
+                <h2 class="mb-0" id="sendingRecipientsCount">0</h2>
             </div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="card bg-primary text-white">
             <div class="card-body">
-                <h5 class="card-title"><i class="bi bi-envelope-fill"></i> Total Emails</h5>
-                <h2 class="mb-0" id="monitoredTotalEmails">0</h2>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card bg-success text-white">
-            <div class="card-body">
-                <h5 class="card-title"><i class="bi bi-person-check"></i> Unique Froms</h5>
-                <h2 class="mb-0" id="monitoredUniqueFroms">0</h2>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card bg-warning text-dark">
-            <div class="card-body">
-                <h5 class="card-title"><i class="bi bi-clock-history"></i> Last Update</h5>
-                <h6 class="mb-0" id="monitoredLastUpdate">Never</h6>
+                <h5 class="card-title"><i class="bi bi-send-check-fill"></i> Sent</h5>
+                <h2 class="mb-0" id="sendingSentCount">0</h2>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Main Content -->
+<!-- Main Content Tabs -->
 <div class="row">
     <div class="col-12">
-        <div class="card">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="mb-0">From Emails by Account</h5>
-                    <button class="btn btn-primary" onclick="refreshMonitoredData()">
-                        <i class="bi bi-arrow-clockwise"></i> Refresh
-                    </button>
+        <ul class="nav nav-tabs" id="sendingTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="sending-settings-tab" data-bs-toggle="tab" data-bs-target="#sending-settings" type="button">
+                    <i class="bi bi-gear"></i> Settings
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="active-froms-tab" data-bs-toggle="tab" data-bs-target="#active-froms" type="button">
+                    <i class="bi bi-check-circle"></i> Active Froms
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="inactive-froms-tab" data-bs-toggle="tab" data-bs-target="#inactive-froms" type="button">
+                    <i class="bi bi-x-circle"></i> Inactive Froms
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="sending-recipients-tab" data-bs-toggle="tab" data-bs-target="#sending-recipients" type="button">
+                    <i class="bi bi-people"></i> Recipients
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="sending-console-tab" data-bs-toggle="tab" data-bs-target="#sending-console" type="button">
+                    <i class="bi bi-terminal"></i> Console
+                </button>
+            </li>
+        </ul>
+        
+        <div class="tab-content" id="sendingTabContent">
+            <!-- Settings Tab -->
+            <div class="tab-pane fade show active" id="sending-settings" role="tabpanel">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="mb-4"><i class="bi bi-gear"></i> Campaign Settings</h5>
+                        <div id="sendingAlertContainer"></div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">From Email Source</label>
+                                <select class="form-control" id="fromSource">
+                                    <option value="active">Active Froms Only</option>
+                                    <option value="inactive">Inactive Froms Only</option>
+                                    <option value="all">All Froms (Active + Inactive)</option>
+                                </select>
+                                <small class="text-muted">Select which from emails to use</small>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Sender Name</label>
+                                <input type="text" class="form-control" id="sendingSenderName" placeholder="Support">
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label">Subject</label>
+                                <input type="text" class="form-control" id="sendingSubject" placeholder="Important Notice">
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label">Message</label>
+                                <textarea class="form-control" id="sendingMessage" rows="5" placeholder="Enter your email message here..."></textarea>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Sleep Time (seconds)</label>
+                                <input type="number" class="form-control" id="sendingSleepTime" value="1">
+                                <small class="text-muted">Delay between emails</small>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Threads</label>
+                                <input type="number" class="form-control" id="sendingThreads" value="1">
+                                <small class="text-muted">Number of concurrent sending threads</small>
+                            </div>
+                        </div>
+                        
+                        <button class="btn btn-success mt-3" onclick="saveSendingSettings()">
+                            <i class="bi bi-save"></i> Save Settings
+                        </button>
+                    </div>
                 </div>
-                
-                <div class="table-responsive">
-                    <table class="table table-striped table-hover">
-                        <thead>
-                            <tr>
-                                <th>Account</th>
-                                <th>From Emails</th>
-                                <th>Total Emails</th>
-                                <th>Last Email</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="monitoredFromsList">
-                            <tr>
-                                <td colspan="5" class="text-center text-muted">
-                                    <i class="bi bi-inbox"></i> No data received yet. Waiting for initial scan...
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+            </div>
+            
+            <!-- Active Froms Tab -->
+            <div class="tab-pane fade" id="active-froms" role="tabpanel">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="mb-0">Active From Emails</h5>
+                            <button class="btn btn-sm btn-success" onclick="refreshActiveFroms()">
+                                <i class="bi bi-arrow-clockwise"></i> Refresh
+                            </button>
+                        </div>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>From Email</th>
+                                        <th>Source Account</th>
+                                        <th>Last Seen</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="activeFromsList">
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted">
+                                            <i class="bi bi-inbox"></i> No active from emails yet
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Inactive Froms Tab -->
+            <div class="tab-pane fade" id="inactive-froms" role="tabpanel">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="mb-0">Inactive From Emails</h5>
+                            <button class="btn btn-sm btn-secondary" onclick="refreshInactiveFroms()">
+                                <i class="bi bi-arrow-clockwise"></i> Refresh
+                            </button>
+                        </div>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>From Email</th>
+                                        <th>Source Account</th>
+                                        <th>Last Seen</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="inactiveFromsList">
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted">
+                                            <i class="bi bi-inbox"></i> No inactive from emails yet
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recipients Tab -->
+            <div class="tab-pane fade" id="sending-recipients" role="tabpanel">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h5 class="mb-0">Recipients</h5>
+                            <div>
+                                <button class="btn btn-primary" onclick="showBulkRecipientsModal()">
+                                    <i class="bi bi-plus-circle"></i> Bulk Add
+                                </button>
+                                <button class="btn btn-danger" onclick="clearSendingRecipients()">
+                                    <i class="bi bi-trash"></i> Clear All
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <h1 class="display-4 text-primary" id="sendingRecipientsCountLarge">0</h1>
+                                        <p class="text-muted mb-0">Total Recipients</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Console Tab -->
+            <div class="tab-pane fade" id="sending-console" role="tabpanel">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="mb-0">Campaign Console</h5>
+                            <div>
+                                <button class="btn btn-success" id="startSendingBtn" onclick="startSendingCampaign()">
+                                    <i class="bi bi-play-fill"></i> Start Campaign
+                                </button>
+                                <button class="btn btn-danger" id="stopSendingBtn" style="display: none;" onclick="stopSendingCampaign()">
+                                    <i class="bi bi-stop-fill"></i> Stop Campaign
+                                </button>
+                                <button class="btn btn-secondary" onclick="clearSendingConsole()">
+                                    <i class="bi bi-trash"></i> Clear
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div id="sendingConsole" class="console-output" style="height: 500px; overflow-y: auto; background: #1e1e1e; color: #d4d4d4; padding: 15px; font-family: 'Courier New', monospace; border-radius: 5px;">
+                            <div class="text-muted">Campaign console ready. Click "Start Campaign" to begin...</div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Bulk Add Recipients Modal -->
+<div class="modal fade" id="bulkRecipientsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Bulk Add Recipients</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <textarea class="form-control" id="bulkRecipientsInput" rows="15" placeholder="Enter email addresses (one per line)"></textarea>
+                <small class="text-muted">Duplicates will be automatically removed</small>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="addBulkRecipients()">Add Recipients</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
-// Load monitored data from email monitoring API
-function loadMonitoredData() {
-    fetch('/api/monitored/froms')
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) {
-                // Update statistics
-                document.getElementById('monitoredAccounts').textContent = data.total_accounts || 0;
-                document.getElementById('monitoredTotalEmails').textContent = (data.total_emails || 0).toLocaleString();
-                document.getElementById('monitoredUniqueFroms').textContent = (data.unique_froms || 0).toLocaleString();
-                
-                if (data.last_update) {
-                    const lastUpdate = new Date(data.last_update);
-                    document.getElementById('monitoredLastUpdate').textContent = lastUpdate.toLocaleString();
-                } else {
-                    document.getElementById('monitoredLastUpdate').textContent = 'Never';
-                }
-                
-                // Update table
-                const tbody = document.getElementById('monitoredFromsList');
-                if (data.accounts && data.accounts.length > 0) {
-                    tbody.innerHTML = '';
-                    data.accounts.forEach(account => {
-                        const row = document.createElement('tr');
-                        row.innerHTML = `
-                            <td><strong>${account.account_name}</strong></td>
-                            <td><span class="badge bg-primary">${account.from_count || 0}</span></td>
-                            <td><span class="badge bg-info">${account.email_count || 0}</span></td>
-                            <td><small class="text-muted">${account.last_email || 'N/A'}</small></td>
-                            <td>
-                                <button class="btn btn-sm btn-outline-primary" onclick="viewAccountFroms('${account.account_name}')">
-                                    <i class="bi bi-eye"></i> View
-                                </button>
-                            </td>
-                        `;
-                        tbody.appendChild(row);
-                    });
-                } else {
-                    tbody.innerHTML = `
-                        <tr>
-                            <td colspan="5" class="text-center text-muted">
-                                <i class="bi bi-inbox"></i> No data received yet. Waiting for initial scan...
-                            </td>
-                        </tr>
-                    `;
-                }
-            }
-        })
-        .catch(err => {
-            console.error('Error loading monitored data:', err);
-        });
-}
+let monitoredFroms = {};
+let sendingCampaignRunning = false;
+let bulkRecipientsModal;
 
-function refreshMonitoredData() {
-    loadMonitoredData();
-    showAlert('Data refreshed!', 'success');
-}
-
-function viewAccountFroms(accountName) {
-    // TODO: Show modal with all from emails for this account
-    alert('View from emails for: ' + accountName);
-}
-
-function showAlert(message, type) {
-    const alertDiv = document.createElement('div');
-    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
-    alertDiv.innerHTML = `
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    `;
-    document.querySelector('.row').insertAdjacentElement('afterbegin', alertDiv);
-    setTimeout(() => alertDiv.remove(), 3000);
-}
-
-// Load data on page load
+// Initialize
 document.addEventListener('DOMContentLoaded', function() {
-    loadMonitoredData();
+    bulkRecipientsModal = new bootstrap.Modal(document.getElementById('bulkRecipientsModal'));
+    loadMonitoredFroms();
+    loadSendingRecipients();
+    checkSendingStatus();
     
-    // Poll for monitored data every 30 seconds
-    setInterval(loadMonitoredData, 30000);
+    // Periodic updates
+    setInterval(loadMonitoredFroms, 30000); // Every 30 seconds
+    setInterval(checkSendingStatus, 5000); // Every 5 seconds
 });
+
+// Socket.IO listener for new monitored emails
+socket.on('new_monitored_email', function(data) {
+    addToSendingConsole(`[NEW EMAIL] ${data.from} received in ${data.account}`, 'info');
+    showNotification('New Email Monitored', `From: ${data.from}`);
+    loadMonitoredFroms(); // Refresh data
+});
+
+// Socket.IO listener for sending campaign logs
+socket.on('sending_campaign_log', function(data) {
+    addToSendingConsole(data.message, data.type || 'info');
+});
+
+// Socket.IO listener for sending campaign stats
+socket.on('sending_campaign_stats', function(data) {
+    updateSendingStats(data);
+});
+
+// Socket.IO listener for sending campaign complete
+socket.on('sending_campaign_complete', function(data) {
+    addToSendingConsole(data.message, 'success');
+    sendingCampaignRunning = false;
+    updateSendingButtons();
+});
+
+function loadMonitoredFroms() {
+    fetch('/api/monitored/froms')
+        .then(response => response.json())
+        .then(data => {
+            monitoredFroms = data;
+            updateMonitoredCounts();
+            updateActiveFromsList();
+            updateInactiveFromsList();
+        })
+        .catch(error => console.error('Error loading monitored froms:', error));
+}
+
+function updateMonitoredCounts() {
+    let activeCount = 0;
+    let inactiveCount = 0;
+    
+    Object.values(monitoredFroms).forEach(account => {
+        account.from_emails.forEach(fromEmail => {
+            if (fromEmail.status === 'active') {
+                activeCount++;
+            } else {
+                inactiveCount++;
+            }
+        });
+    });
+    
+    document.getElementById('activeFromsCount').textContent = activeCount;
+    document.getElementById('inactiveFromsCount').textContent = inactiveCount;
+}
+
+function updateActiveFromsList() {
+    const tbody = document.getElementById('activeFromsList');
+    tbody.innerHTML = '';
+    
+    let hasActive = false;
+    Object.entries(monitoredFroms).forEach(([accountName, account]) => {
+        account.from_emails.forEach(fromEmail => {
+            if (fromEmail.status === 'active') {
+                hasActive = true;
+                const row = `
+                    <tr>
+                        <td><strong>${fromEmail.email}</strong></td>
+                        <td>${accountName}</td>
+                        <td>${new Date(fromEmail.last_seen).toLocaleString()}</td>
+                        <td>
+                            <button class="btn btn-sm btn-warning" onclick="toggleFromStatus('${fromEmail.email}', 'inactive')">
+                                <i class="bi bi-x-circle"></i> Deactivate
+                            </button>
+                        </td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            }
+        });
+    });
+    
+    if (!hasActive) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted"><i class="bi bi-inbox"></i> No active from emails</td></tr>';
+    }
+}
+
+function updateInactiveFromsList() {
+    const tbody = document.getElementById('inactiveFromsList');
+    tbody.innerHTML = '';
+    
+    let hasInactive = false;
+    Object.entries(monitoredFroms).forEach(([accountName, account]) => {
+        account.from_emails.forEach(fromEmail => {
+            if (fromEmail.status === 'inactive') {
+                hasInactive = true;
+                const row = `
+                    <tr>
+                        <td><strong>${fromEmail.email}</strong></td>
+                        <td>${accountName}</td>
+                        <td>${new Date(fromEmail.last_seen).toLocaleString()}</td>
+                        <td>
+                            <button class="btn btn-sm btn-success" onclick="toggleFromStatus('${fromEmail.email}', 'active')">
+                                <i class="bi bi-check-circle"></i> Activate
+                            </button>
+                        </td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            }
+        });
+    });
+    
+    if (!hasInactive) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted"><i class="bi bi-inbox"></i> No inactive from emails</td></tr>';
+    }
+}
+
+function toggleFromStatus(email, newStatus) {
+    fetch('/api/sending/toggle_from', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            email: email,
+            status: newStatus
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showSendingAlert('success', `From email ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully`);
+            loadMonitoredFroms();
+        } else {
+            showSendingAlert('danger', 'Error toggling from status');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showSendingAlert('danger', 'Error toggling from status');
+    });
+}
+
+function refreshActiveFroms() {
+    loadMonitoredFroms();
+    showSendingAlert('info', 'Active froms refreshed');
+}
+
+function refreshInactiveFroms() {
+    loadMonitoredFroms();
+    showSendingAlert('info', 'Inactive froms refreshed');
+}
+
+function saveSendingSettings() {
+    const settings = {
+        from_source: document.getElementById('fromSource').value,
+        sender_name: document.getElementById('sendingSenderName').value,
+        subject: document.getElementById('sendingSubject').value,
+        message: document.getElementById('sendingMessage').value,
+        sleep_time: document.getElementById('sendingSleepTime').value,
+        threads: document.getElementById('sendingThreads').value
+    };
+    
+    fetch('/api/sending/save_settings', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(settings)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showSendingAlert('success', 'Settings saved successfully');
+        } else {
+            showSendingAlert('danger', 'Error saving settings');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showSendingAlert('danger', 'Error saving settings');
+    });
+}
+
+function showBulkRecipientsModal() {
+    bulkRecipientsModal.show();
+}
+
+function addBulkRecipients() {
+    const input = document.getElementById('bulkRecipientsInput').value;
+    const emails = input.split('\n').map(e => e.trim()).filter(e => e);
+    
+    fetch('/api/sending/add_recipients', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ recipients: emails })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showSendingAlert('success', `Added ${data.added} recipients (${data.duplicates} duplicates removed)`);
+            document.getElementById('bulkRecipientsInput').value = '';
+            bulkRecipientsModal.hide();
+            loadSendingRecipients();
+        } else {
+            showSendingAlert('danger', 'Error adding recipients');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showSendingAlert('danger', 'Error adding recipients');
+    });
+}
+
+function clearSendingRecipients() {
+    if (!confirm('Are you sure you want to clear all recipients?')) return;
+    
+    fetch('/api/sending/clear_recipients', {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showSendingAlert('success', 'Recipients cleared');
+            loadSendingRecipients();
+        } else {
+            showSendingAlert('danger', 'Error clearing recipients');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showSendingAlert('danger', 'Error clearing recipients');
+    });
+}
+
+function loadSendingRecipients() {
+    fetch('/api/sending/recipients')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('sendingRecipientsCount').textContent = data.count;
+            document.getElementById('sendingRecipientsCountLarge').textContent = data.count;
+        })
+        .catch(error => console.error('Error loading recipients:', error));
+}
+
+function startSendingCampaign() {
+    if (!confirm('Start the sending campaign?')) return;
+    
+    fetch('/api/sending/start', {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            sendingCampaignRunning = true;
+            updateSendingButtons();
+            addToSendingConsole('Campaign started successfully', 'success');
+            // Switch to console tab
+            document.getElementById('sending-console-tab').click();
+        } else {
+            showSendingAlert('danger', data.message || 'Error starting campaign');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showSendingAlert('danger', 'Error starting campaign');
+    });
+}
+
+function stopSendingCampaign() {
+    if (!confirm('Stop the sending campaign?')) return;
+    
+    fetch('/api/sending/stop', {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            sendingCampaignRunning = false;
+            updateSendingButtons();
+            addToSendingConsole('Campaign stopped by user', 'warning');
+        } else {
+            showSendingAlert('danger', 'Error stopping campaign');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showSendingAlert('danger', 'Error stopping campaign');
+    });
+}
+
+function checkSendingStatus() {
+    fetch('/api/sending/status')
+        .then(response => response.json())
+        .then(data => {
+            sendingCampaignRunning = data.running;
+            updateSendingButtons();
+            updateStatusBadge(data.running);
+        })
+        .catch(error => console.error('Error checking status:', error));
+}
+
+function updateSendingButtons() {
+    if (sendingCampaignRunning) {
+        document.getElementById('startSendingBtn').style.display = 'none';
+        document.getElementById('stopSendingBtn').style.display = 'inline-block';
+    } else {
+        document.getElementById('startSendingBtn').style.display = 'inline-block';
+        document.getElementById('stopSendingBtn').style.display = 'none';
+    }
+}
+
+function updateStatusBadge(running) {
+    const badge = document.getElementById('sendingStatusBadge');
+    if (running) {
+        badge.className = 'badge bg-success fs-6';
+        badge.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span><i class="bi bi-play-fill"></i> Running';
+    } else {
+        badge.className = 'badge bg-secondary fs-6';
+        badge.innerHTML = '<i class="bi bi-stop-circle"></i> Stopped';
+    }
+}
+
+function updateSendingStats(data) {
+    if (data.sent !== undefined) {
+        document.getElementById('sendingSentCount').textContent = data.sent;
+    }
+}
+
+function addToSendingConsole(message, type = 'info') {
+    const console = document.getElementById('sendingConsole');
+    const timestamp = new Date().toLocaleTimeString();
+    
+    let color = '#d4d4d4';
+    let icon = 'ℹ️';
+    
+    if (type === 'success') {
+        color = '#4ec9b0';
+        icon = '✅';
+    } else if (type === 'error') {
+        color = '#f48771';
+        icon = '❌';
+    } else if (type === 'warning') {
+        color = '#dcdcaa';
+        icon = '⚠️';
+    }
+    
+    const logEntry = `<div style="color: ${color}; margin-bottom: 5px;">[${timestamp}] ${icon} ${message}</div>`;
+    console.innerHTML += logEntry;
+    console.scrollTop = console.scrollHeight;
+}
+
+function clearSendingConsole() {
+    document.getElementById('sendingConsole').innerHTML = '<div class="text-muted">Console cleared.</div>';
+}
+
+function showSendingAlert(type, message) {
+    const alertContainer = document.getElementById('sendingAlertContainer');
+    const alert = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    alertContainer.innerHTML = alert;
+    setTimeout(() => {
+        alertContainer.innerHTML = '';
+    }, 5000);
+}
+
+function showNotification(title, body) {
+    if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(title, { body: body });
+    }
+}
+
+// Request notification permission
+if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+}
 </script>
 {% endblock %}

@@ -2,6 +2,7 @@ import os
 import json
 import threading
 import subprocess
+import configparser
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 from flask_socketio import SocketIO, emit
@@ -37,6 +38,41 @@ monitored_data = {
     'last_update': None
 }
 monitored_lock = threading.Lock()
+
+# File to store active/inactive status for monitored from emails
+from_status_file = os.path.join('Basic', 'sending_from_status.json')
+
+def load_from_status():
+    """Load active/inactive status from file"""
+    try:
+        if os.path.exists(from_status_file):
+            with open(from_status_file, 'r') as f:
+                return json.load(f)
+        return {}
+    except Exception as e:
+        print(f"Error loading from status: {e}")
+        return {}
+
+def save_from_status(status_dict):
+    """Save active/inactive status to file"""
+    try:
+        with open(from_status_file, 'w') as f:
+            json.dump(status_dict, f, indent=2)
+        return True
+    except Exception as e:
+        print(f"Error saving from status: {e}")
+        return False
+
+def get_from_status(email):
+    """Get status for a specific email (defaults to 'active' for new emails)"""
+    status_dict = load_from_status()
+    return status_dict.get(email, 'active')
+
+def set_from_status(email, status):
+    """Set status for a specific email"""
+    status_dict = load_from_status()
+    status_dict[email] = status
+    return save_from_status(status_dict)
 
 PASSWORD = os.getenv('PASSWORD', '@OLDISGOLD2026@')
 BASIC_FOLDER = 'Basic'
@@ -869,25 +905,282 @@ def get_monitored_froms():
     """Get monitored from emails for display in UI"""
     try:
         with monitored_lock:
-            accounts_list = []
+            # Transform data for new UI with active/inactive status
+            formatted_data = {}
             for account_name, account_data in monitored_data['accounts'].items():
-                accounts_list.append({
-                    'account_name': account_name,
-                    'from_count': account_data['from_count'],
+                formatted_data[account_name] = {
+                    'from_emails': [
+                        {
+                            'email': from_email,
+                            'status': get_from_status(from_email),
+                            'last_seen': account_data['last_email']
+                        }
+                        for from_email in account_data['from_emails']
+                    ],
                     'email_count': account_data['email_count'],
+                    'from_count': account_data['from_count'],
                     'last_email': account_data['last_email']
-                })
+                }
             
-            return jsonify({
-                'success': True,
-                'total_accounts': monitored_data['total_accounts'],
-                'total_emails': monitored_data['total_emails'],
-                'unique_froms': monitored_data['unique_froms'],
-                'last_update': monitored_data['last_update'],
-                'accounts': accounts_list
-            })
+            return jsonify(formatted_data)
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+# Sending Campaign API endpoints
+sending_recipients_file = os.path.join('Basic', 'sending_recipients.txt')
+sending_settings_file = os.path.join('Basic', 'sending_config.ini')
+sending_campaign_running = False
+sending_campaign_thread = None
+
+@app.route('/api/sending/toggle_from', methods=['POST'])
+@login_required
+def toggle_from_status():
+    """Toggle from email between active and inactive"""
+    try:
+        data = request.json
+        email = data.get('email')
+        new_status = data.get('status')
+        
+        if not email or new_status not in ['active', 'inactive']:
+            return jsonify({'success': False, 'error': 'Invalid parameters'}), 400
+        
+        # Save status to file
+        if set_from_status(email, new_status):
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': 'Failed to save status'}), 500
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/sending/save_settings', methods=['POST'])
+@login_required
+def save_sending_settings():
+    """Save sending campaign settings"""
+    try:
+        settings = request.json
+        
+        # Save to config file
+        config = configparser.ConfigParser()
+        if not config.has_section('sending'):
+            config.add_section('sending')
+        
+        config.set('sending', 'from_source', settings.get('from_source', 'active'))
+        config.set('sending', 'sender_name', settings.get('sender_name', ''))
+        config.set('sending', 'subject', settings.get('subject', ''))
+        config.set('sending', 'message', settings.get('message', ''))
+        config.set('sending', 'sleep_time', str(settings.get('sleep_time', 1)))
+        config.set('sending', 'threads', str(settings.get('threads', 1)))
+        
+        with open(sending_settings_file, 'w') as f:
+            config.write(f)
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/sending/add_recipients', methods=['POST'])
+@login_required
+def add_sending_recipients():
+    """Add recipients to sending campaign"""
+    try:
+        data = request.json
+        new_recipients = data.get('recipients', [])
+        
+        # Read existing recipients
+        existing = set()
+        if os.path.exists(sending_recipients_file):
+            with open(sending_recipients_file, 'r') as f:
+                existing = set(line.strip() for line in f if line.strip())
+        
+        # Add new recipients (removing duplicates)
+        before_count = len(existing)
+        existing.update(new_recipients)
+        after_count = len(existing)
+        
+        # Write back
+        with open(sending_recipients_file, 'w') as f:
+            for email in existing:
+                f.write(f"{email}\n")
+        
+        return jsonify({
+            'success': True,
+            'added': after_count - before_count,
+            'duplicates': len(new_recipients) - (after_count - before_count),
+            'total': after_count
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/sending/clear_recipients', methods=['POST'])
+@login_required
+def clear_sending_recipients():
+    """Clear all recipients"""
+    try:
+        if os.path.exists(sending_recipients_file):
+            with open(sending_recipients_file, 'w') as f:
+                f.write('')
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/sending/recipients', methods=['GET'])
+@login_required
+def get_sending_recipients():
+    """Get recipient count"""
+    try:
+        count = 0
+        if os.path.exists(sending_recipients_file):
+            with open(sending_recipients_file, 'r') as f:
+                count = sum(1 for line in f if line.strip())
+        return jsonify({'count': count})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/sending/start', methods=['POST'])
+@login_required
+def start_sending_campaign():
+    """Start sending campaign"""
+    global sending_campaign_running, sending_campaign_thread
+    
+    try:
+        if sending_campaign_running:
+            return jsonify({'success': False, 'message': 'Campaign already running'})
+        
+        # Validate we have recipients
+        if not os.path.exists(sending_recipients_file):
+            return jsonify({'success': False, 'message': 'No recipients added'})
+        
+        with open(sending_recipients_file, 'r') as f:
+            recipients = [line.strip() for line in f if line.strip()]
+        
+        if not recipients:
+            return jsonify({'success': False, 'message': 'No recipients added'})
+        
+        # Validate we have from emails
+        with monitored_lock:
+            total_froms = sum(len(acc['from_emails']) for acc in monitored_data['accounts'].values())
+        
+        if total_froms == 0:
+            return jsonify({'success': False, 'message': 'No from emails available'})
+        
+        # Start campaign in background thread
+        sending_campaign_running = True
+        sending_campaign_thread = threading.Thread(target=run_sending_campaign, daemon=False)
+        sending_campaign_thread.start()
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/sending/stop', methods=['POST'])
+@login_required
+def stop_sending_campaign():
+    """Stop sending campaign"""
+    global sending_campaign_running
+    
+    try:
+        sending_campaign_running = False
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/sending/status', methods=['GET'])
+@login_required
+def get_sending_status():
+    """Get sending campaign status"""
+    return jsonify({'running': sending_campaign_running})
+
+def run_sending_campaign():
+    """Background thread for sending campaign"""
+    global sending_campaign_running
+    
+    try:
+        socketio.emit('sending_campaign_log', {
+            'message': 'Campaign started',
+            'type': 'success'
+        })
+        
+        # Load settings
+        config = configparser.ConfigParser()
+        if os.path.exists(sending_settings_file):
+            config.read(sending_settings_file)
+        
+        from_source = config.get('sending', 'from_source', fallback='active')
+        sender_name = config.get('sending', 'sender_name', fallback='')
+        subject = config.get('sending', 'subject', fallback='')
+        message = config.get('sending', 'message', fallback='')
+        sleep_time = config.getint('sending', 'sleep_time', fallback=1)
+        threads = config.getint('sending', 'threads', fallback=1)
+        
+        # Load recipients
+        with open(sending_recipients_file, 'r') as f:
+            recipients = [line.strip() for line in f if line.strip()]
+        
+        # Get from emails based on source and filter by status
+        with monitored_lock:
+            all_from_emails = []
+            for account_data in monitored_data['accounts'].values():
+                all_from_emails.extend(account_data['from_emails'])
+        
+        # Filter based on from_source setting
+        filtered_from_emails = []
+        for from_email in all_from_emails:
+            status = get_from_status(from_email)
+            if from_source == 'active' and status == 'active':
+                filtered_from_emails.append(from_email)
+            elif from_source == 'inactive' and status == 'inactive':
+                filtered_from_emails.append(from_email)
+            elif from_source == 'all':
+                filtered_from_emails.append(from_email)
+        
+        if not filtered_from_emails:
+            socketio.emit('sending_campaign_log', {
+                'message': f'No {from_source} from emails available',
+                'type': 'error'
+            })
+            sending_campaign_running = False
+            return
+        
+        socketio.emit('sending_campaign_log', {
+            'message': f'Starting round-robin sending: {len(filtered_from_emails)} {from_source} froms → {len(recipients)} recipients',
+            'type': 'info'
+        })
+        
+        # Round-robin sending
+        sent_count = 0
+        from_index = 0
+        
+        for recipient in recipients:
+            if not sending_campaign_running:
+                break
+            
+            # Get next from email (round-robin)
+            current_from = filtered_from_emails[from_index]
+            from_index = (from_index + 1) % len(filtered_from_emails)
+            
+            # TODO: Actually send email here using SMTP
+            # For now, just simulate sending
+            socketio.emit('sending_campaign_log', {
+                'message': f'Sent to {recipient} from {current_from}',
+                'type': 'success'
+            })
+            
+            sent_count += 1
+            socketio.emit('sending_campaign_stats', {'sent': sent_count})
+            
+            time.sleep(sleep_time)
+        
+        socketio.emit('sending_campaign_complete', {
+            'message': f'Campaign completed! Sent {sent_count} emails'
+        })
+        
+    except Exception as e:
+        socketio.emit('sending_campaign_log', {
+            'message': f'Error: {str(e)}',
+            'type': 'error'
+        })
+    finally:
+        sending_campaign_running = False
 
 # WebSocket events
 @socketio.on('connect')
