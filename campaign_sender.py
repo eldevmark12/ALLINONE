@@ -11,7 +11,7 @@ import time
 import os
 
 class CampaignSender:
-    def __init__(self, config, callback=None):
+    def __init__(self, config, callback=None, from_file_path=None):
         self.config = config
         self.callback = callback
         self.total_sent = 0
@@ -21,6 +21,8 @@ class CampaignSender:
         self.smtp_lock = threading.Lock()
         self.from_index = 0
         self.recipient_index = 0
+        self.from_file_path = from_file_path
+        self.used_from_emails = set()  # Track used from emails
         
     def log(self, message, log_type='info'):
         """Send log message via callback"""
@@ -50,6 +52,8 @@ class CampaignSender:
                 self.from_index = 0
             from_email = from_emails[self.from_index]
             self.from_index += 1
+            # Track this from email as used
+            self.used_from_emails.add(from_email)
         return from_email
     
     def get_next_smtp(self, smtp_servers):
@@ -154,6 +158,7 @@ class CampaignSender:
         self.total_sent = 0
         self.total_failed = 0
         self.smtp_stats = {}
+        self.used_from_emails = set()
         
         self.log(f"Starting campaign: {len(recipients)} recipients, {len(from_emails)} from emails, {len([s for s in smtp_servers if s.get('status') == 'active'])} active SMTPs", 'info')
         
@@ -177,6 +182,10 @@ class CampaignSender:
             # Send email
             self.send_email(recipient, from_email, smtp_server, html_content, subject, sender_name)
         
+        # Remove used from emails from file
+        if self.from_file_path and self.used_from_emails:
+            self.remove_used_from_emails()
+        
         # Campaign complete
         self.running = False
         if self.callback:
@@ -188,6 +197,31 @@ class CampaignSender:
             })
         
         self.log(f"Campaign completed: {self.total_sent} sent, {self.total_failed} failed", 'success')
+    
+    def remove_used_from_emails(self):
+        """Remove used from emails from the from.txt file"""
+        try:
+            if not os.path.exists(self.from_file_path):
+                return
+            
+            # Read all from emails
+            with open(self.from_file_path, 'r') as f:
+                all_from_emails = [line.strip() for line in f if line.strip()]
+            
+            # Filter out used emails
+            remaining_emails = [email for email in all_from_emails if email not in self.used_from_emails]
+            
+            # Write back remaining emails
+            with open(self.from_file_path, 'w') as f:
+                for email in remaining_emails:
+                    f.write(f"{email}\n")
+            
+            removed_count = len(self.used_from_emails)
+            remaining_count = len(remaining_emails)
+            self.log(f"Removed {removed_count} used from emails. {remaining_count} remaining.", 'info')
+            
+        except Exception as e:
+            self.log(f"Error removing used from emails: {str(e)}", 'error')
     
     def stop(self):
         """Stop the campaign"""

@@ -25,6 +25,8 @@ campaign_stats = {
     'start_time': None,
     'status': 'idle'
 }
+campaign_logs = []  # Store campaign logs
+campaign_lock = threading.Lock()
 
 PASSWORD = os.getenv('PASSWORD', '@OLDISGOLD2026@')
 BASIC_FOLDER = 'Basic'
@@ -556,15 +558,17 @@ def start_campaign():
             'status': 'running'
         }
         
-        # Start the campaign in a separate thread
+        with campaign_lock:
+            campaign_logs = []  # Clear previous logs
+            campaign_running = True
+        
+        # Start the campaign in a separate thread (non-daemon so it continues after browser closes)
         thread = threading.Thread(
             target=run_campaign_background,
             args=(recipients, from_emails, smtp_servers, html_content, config['Settings'])
         )
-        thread.daemon = True
+        thread.daemon = False  # Allow campaign to continue running after browser closes
         thread.start()
-        
-        campaign_running = True
         
         return jsonify({'success': True, 'message': f'Campaign started: {len(recipients)} recipients, {len(active_smtps)} active SMTPs'})
     except Exception as e:
@@ -594,35 +598,52 @@ def stop_campaign():
 @app.route('/api/campaign/stats', methods=['GET'])
 @login_required
 def get_campaign_stats():
-    return jsonify({
-        'success': True,
-        'stats': campaign_stats,
-        'running': campaign_running
-    })
+    global campaign_logs
+    with campaign_lock:
+        return jsonify({
+            'success': True,
+            'stats': campaign_stats,
+            'running': campaign_running,
+            'logs': campaign_logs[-100:]  # Return last 100 logs
+        })
 
 def run_campaign_background(recipients, from_emails, smtp_servers, html_content, config_settings):
     """Run campaign using campaign_sender module"""
-    global campaign_process, campaign_running, campaign_stats
+    global campaign_process, campaign_running, campaign_stats, campaign_logs
     
     try:
         from campaign_sender import CampaignSender
         
         def campaign_callback(event):
             """Handle campaign events"""
+            timestamp = datetime.now().strftime('%H:%M:%S')
+            log_entry = {'time': timestamp, 'message': '', 'type': 'info'}
+            
             if event['type'] == 'log':
+                log_entry['message'] = event['message']
+                log_entry['type'] = event['log_type']
+                with campaign_lock:
+                    campaign_logs.append(log_entry)
+                    if len(campaign_logs) > 1000:  # Keep last 1000 logs
+                        campaign_logs = campaign_logs[-1000:]
                 socketio.emit('campaign_log', {'message': event['message'], 'type': event['log_type']})
+                
             elif event['type'] == 'stats':
-                campaign_stats['total_sent'] = event['sent']
-                campaign_stats['total_failed'] = event['failed']
+                with campaign_lock:
+                    campaign_stats['total_sent'] = event['sent']
+                    campaign_stats['total_failed'] = event['failed']
                 socketio.emit('campaign_stats', {'sent': event['sent'], 'failed': event['failed']})
+                
             elif event['type'] == 'complete':
                 # Update SMTP sent counts in smtp.txt
                 update_smtp_sent_counts(event.get('smtp_stats', {}))
-                campaign_stats['status'] = 'completed'
+                with campaign_lock:
+                    campaign_stats['status'] = 'completed'
                 socketio.emit('campaign_complete', {'sent': event['sent'], 'failed': event['failed']})
         
-        # Create campaign sender instance
-        sender = CampaignSender(config_settings, campaign_callback)
+        # Create campaign sender instance with from file path
+        from_file_path = os.path.join(BASIC_FOLDER, 'from.txt')
+        sender = CampaignSender(config_settings, campaign_callback, from_file_path)
         campaign_process = sender
         
         # Run campaign
@@ -636,10 +657,14 @@ def run_campaign_background(recipients, from_emails, smtp_servers, html_content,
         )
         
     except Exception as e:
-        socketio.emit('campaign_log', {'message': f'Campaign error: {str(e)}', 'type': 'error'})
-        campaign_stats['status'] = 'error'
+        error_msg = f'Campaign error: {str(e)}'
+        with campaign_lock:
+            campaign_logs.append({'time': datetime.now().strftime('%H:%M:%S'), 'message': error_msg, 'type': 'error'})
+            campaign_stats['status'] = 'error'
+        socketio.emit('campaign_log', {'message': error_msg, 'type': 'error'})
     finally:
-        campaign_running = False
+        with campaign_lock:
+            campaign_running = False
         campaign_process = None
 
 def update_smtp_sent_counts(smtp_stats):

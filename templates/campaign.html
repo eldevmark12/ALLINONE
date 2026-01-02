@@ -316,6 +316,11 @@ function initCampaignSocket() {
             document.getElementById('startBtn').style.display = 'inline-block';
             document.getElementById('stopBtn').style.display = 'none';
             addConsoleLog(`Campaign completed! Sent: ${data.sent}, Failed: ${data.failed}`, 'success');
+            
+            // Refresh from email count to show removed emails
+            setTimeout(() => {
+                loadFromEmails();
+            }, 1000);
         });
     } else {
         setTimeout(initCampaignSocket, 100);
@@ -568,12 +573,59 @@ function showAlert(message, type) {
     setTimeout(() => alert.remove(), 5000);
 }
 
+// Check campaign status on load
+function checkCampaignStatus() {
+    fetch('/api/campaign/stats')
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                campaignRunning = data.running;
+                
+                if (data.running) {
+                    // Campaign is running, update UI
+                    document.getElementById('startBtn').style.display = 'none';
+                    document.getElementById('stopBtn').style.display = 'inline-block';
+                    
+                    // Load previous logs
+                    if (data.logs && data.logs.length > 0) {
+                        data.logs.forEach(log => {
+                            addConsoleLog(log.message, log.type);
+                        });
+                    }
+                    
+                    // Update stats
+                    updateStats(data.stats);
+                    
+                    addConsoleLog('Reconnected to running campaign...', 'success');
+                } else {
+                    document.getElementById('startBtn').style.display = 'inline-block';
+                    document.getElementById('stopBtn').style.display = 'none';
+                }
+                
+                // Update stats anyway
+                if (data.stats) {
+                    updateStats(data.stats);
+                }
+            }
+        })
+        .catch(err => console.error('Error checking campaign status:', err));
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     initCampaignSocket();
     loadConfig();
     loadFromEmails();
     loadRecipients();
+    checkCampaignStatus();
+    
+    // Poll for from email count updates every 10 seconds when campaign is running
+    setInterval(() => {
+        if (campaignRunning) {
+            loadFromEmails();
+        }
+    }, 10000);
 });
 </script>
 {% endblock %}
+
