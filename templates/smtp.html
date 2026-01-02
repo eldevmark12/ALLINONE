@@ -104,12 +104,13 @@
                                 <th>Password</th>
                                 <th>Host</th>
                                 <th>Port</th>
+                                <th>Sent</th>
                                 <th width="150">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="smtpTableBody">
                             <tr>
-                                <td colspan="7" class="text-center">
+                                <td colspan="8" class="text-center">
                                     <div class="spinner-border" role="status">
                                         <span class="visually-hidden">Loading...</span>
                                     </div>
@@ -264,7 +265,7 @@ function renderTable() {
     }
     
     if (filteredServers.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No SMTP servers configured. Click "Add Server" or "Bulk Add SMTPs" to get started.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No SMTP servers configured. Click "Add Server" or "Bulk Add SMTPs" to get started.</td></tr>';
         return;
     }
     
@@ -273,6 +274,7 @@ function renderTable() {
         const statusBadge = server.status === 'active' 
             ? '<span class="badge bg-success">Active</span>' 
             : '<span class="badge bg-secondary">Inactive</span>';
+        const sentCount = server.sent || 0;
         
         return `
         <tr>
@@ -282,6 +284,7 @@ function renderTable() {
             <td><input type="password" class="form-control form-control-sm" value="${server.password}" onchange="updateServer(${actualIndex}, 'password', this.value)"></td>
             <td><input type="text" class="form-control form-control-sm" value="${server.host}" onchange="updateServer(${actualIndex}, 'host', this.value)"></td>
             <td><input type="number" class="form-control form-control-sm" value="${server.port}" onchange="updateServer(${actualIndex}, 'port', this.value)"></td>
+            <td><span class="badge bg-info">${sentCount}</span></td>
             <td>
                 <button class="btn btn-info btn-sm" onclick="validateSingle(${actualIndex})" title="Validate">
                     <i class="bi bi-check-circle"></i>

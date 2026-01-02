@@ -5,67 +5,288 @@
 {% block content %}
 <div class="row">
     <div class="col-12 mb-4">
-        <h1><i class="bi bi-gear-fill"></i> Campaign Settings</h1>
+        <h1><i class="bi bi-gear-fill"></i> Campaign Manager</h1>
     </div>
 </div>
 
-<div class="row">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header bg-dark text-white">
-                <h5 class="mb-0">Configuration Settings</h5>
-            </div>
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
             <div class="card-body">
-                <div id="alertContainer"></div>
-                
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">Domain From</label>
-                        <input type="text" class="form-control" id="domainfrom" placeholder="yourdomain.com">
-                    </div>
-                    
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">Domain Authentication</label>
-                        <input type="text" class="form-control" id="domainauth" placeholder="auth.yourdomain.com">
-                    </div>
-                </div>
-                
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">Sleep Time (seconds)</label>
-                        <input type="number" class="form-control" id="sleeptime" placeholder="1">
-                    </div>
-                    
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">Threads</label>
-                        <input type="number" class="form-control" id="threads" placeholder="5">
-                    </div>
-                </div>
-                
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">Emails File Path</label>
-                        <input type="text" class="form-control" id="emailspath" placeholder="emailx.txt">
-                    </div>
-                    
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">Working SMTP File</label>
-                        <input type="text" class="form-control" id="workingsmtp" placeholder="working_smtp.txt">
-                    </div>
-                </div>
-                
-                <button class="btn btn-success mt-3" onclick="saveConfig()">
-                    <i class="bi bi-save"></i> Save Configuration
-                </button>
-                <button class="btn btn-secondary mt-3" onclick="loadConfig()">
-                    <i class="bi bi-arrow-clockwise"></i> Reload
-                </button>
+                <h5 class="card-title"><i class="bi bi-envelope-fill"></i> From Emails</h5>
+                <h2 class="mb-0" id="fromCount">0</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-people-fill"></i> Recipients</h5>
+                <h2 class="mb-0" id="recipientCount">0</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-send-fill"></i> Sent</h5>
+                <h2 class="mb-0" id="sentCount">0</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-danger text-white">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-x-circle-fill"></i> Failed</h5>
+                <h2 class="mb-0" id="failedCount">0</h2>
             </div>
         </div>
     </div>
 </div>
 
+<!-- Main Content Tabs -->
+<div class="row">
+    <div class="col-12">
+        <ul class="nav nav-tabs" id="campaignTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="settings-tab" data-bs-toggle="tab" data-bs-target="#settings" type="button">
+                    <i class="bi bi-gear"></i> Settings
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="from-tab" data-bs-toggle="tab" data-bs-target="#from" type="button">
+                    <i class="bi bi-envelope"></i> From Emails
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="recipients-tab" data-bs-toggle="tab" data-bs-target="#recipients" type="button">
+                    <i class="bi bi-people"></i> Recipients
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="console-tab" data-bs-toggle="tab" data-bs-target="#console" type="button">
+                    <i class="bi bi-terminal"></i> Console
+                </button>
+            </li>
+        </ul>
+        
+        <div class="tab-content" id="campaignTabContent">
+            <!-- Settings Tab -->
+            <div class="tab-pane fade show active" id="settings" role="tabpanel">
+                <div class="card">
+                    <div class="card-body">
+                        <div id="alertContainer"></div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Domain From</label>
+                                <input type="text" class="form-control" id="domainfrom" placeholder="charter.net">
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Domain Authentication</label>
+                                <input type="text" class="form-control" id="domainauth" placeholder="altona.fr">
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Sleep Time (seconds)</label>
+                                <input type="number" class="form-control" id="sleeptime" placeholder="1">
+                                <small class="text-muted">Delay between each email</small>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Threads</label>
+                                <input type="number" class="form-control" id="threads" placeholder="3">
+                                <small class="text-muted">Number of concurrent sending threads</small>
+                            </div>
+                        </div>
+                        
+                        <button class="btn btn-success mt-3" onclick="saveConfig()">
+                            <i class="bi bi-save"></i> Save Configuration
+                        </button>
+                        <button class="btn btn-secondary mt-3" onclick="loadConfig()">
+                            <i class="bi bi-arrow-clockwise"></i> Reload
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- From Emails Tab -->
+            <div class="tab-pane fade" id="from" role="tabpanel">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-3">
+                            <h5>From Email Addresses</h5>
+                            <div>
+                                <button class="btn btn-primary" onclick="showBulkFromModal()">
+                                    <i class="bi bi-plus-circle"></i> Bulk Add
+                                </button>
+                                <button class="btn btn-danger" onclick="clearFromList()">
+                                    <i class="bi bi-trash"></i> Clear All
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th width="60">#</th>
+                                        <th>Email Address</th>
+                                        <th width="100">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="fromTableBody">
+                                    <tr>
+                                        <td colspan="3" class="text-center text-muted">No from emails loaded</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recipients Tab -->
+            <div class="tab-pane fade" id="recipients" role="tabpanel">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-3">
+                            <h5>Recipient Email Addresses</h5>
+                            <div>
+                                <button class="btn btn-primary" onclick="showBulkRecipientsModal()">
+                                    <i class="bi bi-plus-circle"></i> Bulk Add
+                                </button>
+                                <button class="btn btn-danger" onclick="clearRecipientsList()">
+                                    <i class="bi bi-trash"></i> Clear All
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th width="60">#</th>
+                                        <th>Email Address</th>
+                                        <th width="100">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recipientsTableBody">
+                                    <tr>
+                                        <td colspan="3" class="text-center text-muted">No recipients loaded</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Console Tab -->
+            <div class="tab-pane fade" id="console" role="tabpanel">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-3">
+                            <h5>Campaign Console</h5>
+                            <div>
+                                <button class="btn btn-success" onclick="startCampaign()" id="startBtn">
+                                    <i class="bi bi-play-fill"></i> Start Campaign
+                                </button>
+                                <button class="btn btn-danger" onclick="stopCampaign()" id="stopBtn" style="display:none;">
+                                    <i class="bi bi-stop-fill"></i> Stop Campaign
+                                </button>
+                                <button class="btn btn-secondary" onclick="clearConsole()">
+                                    <i class="bi bi-trash"></i> Clear
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div id="consoleOutput" style="background-color: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 5px; height: 600px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 12px;">
+                            <div class="text-success">Console ready. Click "Start Campaign" to begin sending...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Add From Emails Modal -->
+<div class="modal fade" id="bulkFromModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Bulk Add From Emails</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Paste email addresses (one per line). Duplicates will be removed automatically.</p>
+                <textarea class="form-control" id="bulkFromInput" rows="15" placeholder="email1@example.com&#10;email2@example.com&#10;email3@example.com"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="processBulkFrom()">Add Emails</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Add Recipients Modal -->
+<div class="modal fade" id="bulkRecipientsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Bulk Add Recipients</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Paste recipient email addresses (one per line). Duplicates will be removed automatically.</p>
+                <textarea class="form-control" id="bulkRecipientsInput" rows="15" placeholder="recipient1@example.com&#10;recipient2@example.com&#10;recipient3@example.com"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="processBulkRecipients()">Add Emails</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
 <script>
+let campaignSocket = null;
+let campaignRunning = false;
+
+// Initialize socket connection
+function initCampaignSocket() {
+    if (typeof io !== 'undefined') {
+        campaignSocket = io();
+        
+        campaignSocket.on('campaign_log', function(data) {
+            addConsoleLog(data.message, data.type || 'info');
+        });
+        
+        campaignSocket.on('campaign_stats', function(data) {
+            updateStats(data);
+        });
+        
+        campaignSocket.on('campaign_complete', function(data) {
+            campaignRunning = false;
+            document.getElementById('startBtn').style.display = 'inline-block';
+            document.getElementById('stopBtn').style.display = 'none';
+            addConsoleLog(`Campaign completed! Sent: ${data.sent}, Failed: ${data.failed}`, 'success');
+        });
+    } else {
+        setTimeout(initCampaignSocket, 100);
+    }
+}
+
+// Load configuration
 function loadConfig() {
     fetch('/api/config/get')
         .then(res => res.json())
@@ -76,8 +297,6 @@ function loadConfig() {
                 document.getElementById('domainauth').value = config.domain_authentication || '';
                 document.getElementById('sleeptime').value = config.sleeptime || '';
                 document.getElementById('threads').value = config.threads || '';
-                document.getElementById('emailspath').value = config.emailspath || '';
-                document.getElementById('workingsmtp').value = config.workingsmtp || '';
             }
         })
         .catch(err => {
@@ -85,43 +304,301 @@ function loadConfig() {
         });
 }
 
+// Save configuration
 function saveConfig() {
     const settings = {
         domainfrom: document.getElementById('domainfrom').value,
         domain_authentication: document.getElementById('domainauth').value,
         sleeptime: document.getElementById('sleeptime').value,
-        threads: document.getElementById('threads').value,
-        emailspath: document.getElementById('emailspath').value,
-        workingsmtp: document.getElementById('workingsmtp').value
+        threads: document.getElementById('threads').value
     };
     
     fetch('/api/config/save', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({settings: settings})
+        body: JSON.stringify(settings)
     })
     .then(res => res.json())
     .then(data => {
         if (data.success) {
-            showAlert(data.message, 'success');
+            showAlert('Configuration saved successfully!', 'success');
         } else {
             showAlert('Error: ' + data.error, 'danger');
         }
     })
     .catch(err => {
-        showAlert('Error saving: ' + err.message, 'danger');
+        showAlert('Error saving configuration: ' + err.message, 'danger');
     });
 }
 
-function showAlert(message, type) {
-    const alertDiv = document.getElementById('alertContainer');
-    alertDiv.innerHTML = `<div class="alert alert-${type} alert-dismissible fade show" role="alert">
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>`;
+// Load from emails
+function loadFromEmails() {
+    fetch('/api/campaign/from/list')
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                renderFromTable(data.emails);
+                document.getElementById('fromCount').textContent = data.count;
+            }
+        });
 }
 
-// Load on page load
-loadConfig();
+// Render from emails table
+function renderFromTable(emails) {
+    const tbody = document.getElementById('fromTableBody');
+    if (!emails || emails.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No from emails loaded</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = emails.map((email, index) => `
+        <tr>
+            <td>${index + 1}</td>
+            <td>${email}</td>
+            <td>
+                <button class="btn btn-sm btn-danger" onclick="deleteFromEmail(${index})">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+// Load recipients
+function loadRecipients() {
+    fetch('/api/campaign/recipients/list')
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                renderRecipientsTable(data.emails);
+                document.getElementById('recipientCount').textContent = data.count;
+            }
+        });
+}
+
+// Render recipients table
+function renderRecipientsTable(emails) {
+    const tbody = document.getElementById('recipientsTableBody');
+    if (!emails || emails.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No recipients loaded</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = emails.map((email, index) => `
+        <tr>
+            <td>${index + 1}</td>
+            <td>${email}</td>
+            <td>
+                <button class="btn btn-sm btn-danger" onclick="deleteRecipient(${index})">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+// Show bulk from modal
+function showBulkFromModal() {
+    const modal = new bootstrap.Modal(document.getElementById('bulkFromModal'));
+    modal.show();
+}
+
+// Process bulk from emails
+function processBulkFrom() {
+    const input = document.getElementById('bulkFromInput').value;
+    const emails = input.split('\n')
+        .map(e => e.trim())
+        .filter(e => e && e.includes('@'));
+    
+    if (emails.length === 0) {
+        alert('No valid email addresses found');
+        return;
+    }
+    
+    fetch('/api/campaign/from/bulk', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({emails: emails})
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('bulkFromModal')).hide();
+            document.getElementById('bulkFromInput').value = '';
+            loadFromEmails();
+            showAlert(`Added ${data.added} emails (${data.duplicates} duplicates removed)`, 'success');
+        }
+    });
+}
+
+// Show bulk recipients modal
+function showBulkRecipientsModal() {
+    const modal = new bootstrap.Modal(document.getElementById('bulkRecipientsModal'));
+    modal.show();
+}
+
+// Process bulk recipients
+function processBulkRecipients() {
+    const input = document.getElementById('bulkRecipientsInput').value;
+    const emails = input.split('\n')
+        .map(e => e.trim())
+        .filter(e => e && e.includes('@'));
+    
+    if (emails.length === 0) {
+        alert('No valid email addresses found');
+        return;
+    }
+    
+    fetch('/api/campaign/recipients/bulk', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({emails: emails})
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('bulkRecipientsModal')).hide();
+            document.getElementById('bulkRecipientsInput').value = '';
+            loadRecipients();
+            showAlert(`Added ${data.added} emails (${data.duplicates} duplicates removed)`, 'success');
+        }
+    });
+}
+
+// Delete from email
+function deleteFromEmail(index) {
+    if (confirm('Delete this from email?')) {
+        fetch('/api/campaign/from/delete', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({index: index})
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                loadFromEmails();
+            }
+        });
+    }
+}
+
+// Delete recipient
+function deleteRecipient(index) {
+    if (confirm('Delete this recipient?')) {
+        fetch('/api/campaign/recipients/delete', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({index: index})
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                loadRecipients();
+            }
+        });
+    }
+}
+
+// Clear from list
+function clearFromList() {
+    if (confirm('Clear all from emails?')) {
+        fetch('/api/campaign/from/clear', {method: 'POST'})
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) loadFromEmails();
+            });
+    }
+}
+
+// Clear recipients list
+function clearRecipientsList() {
+    if (confirm('Clear all recipients?')) {
+        fetch('/api/campaign/recipients/clear', {method: 'POST'})
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) loadRecipients();
+            });
+    }
+}
+
+// Start campaign
+function startCampaign() {
+    if (!confirm('Start campaign? This will begin sending emails.')) return;
+    
+    fetch('/api/campaign/start', {method: 'POST'})
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                campaignRunning = true;
+                document.getElementById('startBtn').style.display = 'none';
+                document.getElementById('stopBtn').style.display = 'inline-block';
+                addConsoleLog('Campaign started...', 'success');
+            } else {
+                alert('Error: ' + data.error);
+            }
+        });
+}
+
+// Stop campaign
+function stopCampaign() {
+    if (!confirm('Stop campaign?')) return;
+    
+    fetch('/api/campaign/stop', {method: 'POST'})
+        .then(res => res.json())
+        .then(data => {
+            campaignRunning = false;
+            document.getElementById('startBtn').style.display = 'inline-block';
+            document.getElementById('stopBtn').style.display = 'none';
+            addConsoleLog('Campaign stopped by user', 'warning');
+        });
+}
+
+// Add console log
+function addConsoleLog(message, type = 'info') {
+    const console = document.getElementById('consoleOutput');
+    const time = new Date().toLocaleTimeString();
+    let color = '#d4d4d4';
+    
+    if (type === 'success') color = '#4ec9b0';
+    else if (type === 'error') color = '#f48771';
+    else if (type === 'warning') color = '#dcdcaa';
+    
+    const log = document.createElement('div');
+    log.style.color = color;
+    log.textContent = `[${time}] ${message}`;
+    console.appendChild(log);
+    console.scrollTop = console.scrollHeight;
+}
+
+// Clear console
+function clearConsole() {
+    document.getElementById('consoleOutput').innerHTML = '<div class="text-success">Console cleared.</div>';
+}
+
+// Update stats
+function updateStats(stats) {
+    if (stats.sent !== undefined) document.getElementById('sentCount').textContent = stats.sent;
+    if (stats.failed !== undefined) document.getElementById('failedCount').textContent = stats.failed;
+}
+
+// Show alert
+function showAlert(message, type) {
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show`;
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.getElementById('alertContainer').appendChild(alert);
+    setTimeout(() => alert.remove(), 5000);
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    initCampaignSocket();
+    loadConfig();
+    loadFromEmails();
+    loadRecipients();
+});
 </script>
 {% endblock %}

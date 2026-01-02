@@ -1,8 +1,8 @@
-host,port,user,pass
-smtp.hosts.co.uk,587,email@francismcgrath.me,wUadkpFN8X%Smqqe123
-smtp.hosts.co.uk,587,email@francismcgrath.co.uk,KGz6e@w!ZPaGbZku
-smtp.ftc-i.net,587,lvjp@ftc-i.net,$toneWall1
-smtp12.gmoserver.jp,587,aws@fclinc.co.jp,4QEJA$Ug
+host,port,username,password,status,sent
+smtp.hosts.co.uk,587,email@francismcgrath.me,wUadkpFN8X%Smqqe123,inactive,0
+smtp.hosts.co.uk,587,email@francismcgrath.co.uk,KGz6e@w!ZPaGbZku,inactive,0
+smtp.ftc-i.net,587,lvjp@ftc-i.net,$toneWall1,inactive,0
+smtp12.gmoserver.jp,587,aws@fclinc.co.jp,4QEJA$Ug,active,0
 smtp.bajoria.in,587,anant.kumar@bajoria.in,69s2@gig!5
 smtp3.netcore.co.in,587,accounts2@takshiauto.com,@Acc12024#
 mail.pide.gob.pe,587,informatica@muniinambari.gob.pe,Infomatica.MDI@2026

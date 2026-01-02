@@ -116,6 +116,7 @@ def get_smtp_list():
                         parts = line.strip().split(',')
                         if len(parts) >= 4:
                             status = parts[4] if len(parts) > 4 else 'inactive'
+                            sent = int(parts[5]) if len(parts) > 5 else 0
                             servers.append({
                                 'id': i,
                                 'host': parts[0].strip(),
@@ -123,7 +124,8 @@ def get_smtp_list():
                                 'username': parts[2].strip(),
                                 'email': parts[2].strip(),
                                 'password': parts[3].strip(),
-                                'status': status.strip()
+                                'status': status.strip(),
+                                'sent': sent
                             })
                 return jsonify({'success': True, 'servers': servers})
         return jsonify({'success': True, 'servers': []})
@@ -139,11 +141,12 @@ def save_smtp_list():
         
         smtp_file = os.path.join(BASIC_FOLDER, 'smtp.txt')
         with open(smtp_file, 'w') as f:
-            f.write('host,port,username,password,status\n')
+            f.write('host,port,username,password,status,sent\n')
             for server in servers:
                 status = server.get('status', 'inactive')
+                sent = server.get('sent', 0)
                 email = server.get('username', server.get('email', ''))
-                f.write(f"{server['host']},{server['port']},{email},{server['password']},{status}\n")
+                f.write(f"{server['host']},{server['port']},{email},{server['password']},{status},{sent}\n")
         
         return jsonify({'success': True, 'message': 'SMTP servers saved successfully'})
     except Exception as e:
@@ -236,14 +239,15 @@ def run_smtp_validation(accounts):
             
             # Write updated file
             with open(smtp_file, 'w') as f:
-                f.write('host,port,username,password,status\n')
+                f.write('host,port,username,password,status,sent\n')
                 for line in lines[1:]:  # Skip header
                     if line.strip():
                         parts = line.strip().split(',')
                         if len(parts) >= 4:
                             email = parts[2]
                             status = 'active' if email in validated_emails else 'inactive'
-                            f.write(f"{parts[0]},{parts[1]},{parts[2]},{parts[3]},{status}\n")
+                            sent = int(parts[5]) if len(parts) > 5 else 0
+                            f.write(f"{parts[0]},{parts[1]},{parts[2]},{parts[3]},{status},{sent}\n")
         
         # Emit completion event
         socketio.emit('validation_complete', {'validated': len(validated_emails), 'total': len(accounts)})
@@ -332,6 +336,152 @@ def save_config():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+# Campaign From Emails Management
+@app.route('/api/campaign/from/list', methods=['GET'])
+@login_required
+def get_from_emails():
+    try:
+        from_file = os.path.join(BASIC_FOLDER, 'from.txt')
+        if os.path.exists(from_file):
+            with open(from_file, 'r') as f:
+                emails = [line.strip() for line in f if line.strip() and '@' in line]
+                return jsonify({'success': True, 'emails': emails, 'count': len(emails)})
+        return jsonify({'success': True, 'emails': [], 'count': 0})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/campaign/from/bulk', methods=['POST'])
+@login_required
+def bulk_add_from_emails():
+    try:
+        data = request.get_json()
+        new_emails = data.get('emails', [])
+        
+        from_file = os.path.join(BASIC_FOLDER, 'from.txt')
+        existing_emails = []
+        
+        if os.path.exists(from_file):
+            with open(from_file, 'r') as f:
+                existing_emails = [line.strip() for line in f if line.strip()]
+        
+        # Combine and remove duplicates
+        all_emails = list(set(existing_emails + new_emails))
+        duplicates = len(existing_emails) + len(new_emails) - len(all_emails)
+        
+        with open(from_file, 'w') as f:
+            for email in all_emails:
+                f.write(f"{email}\n")
+        
+        return jsonify({'success': True, 'added': len(all_emails) - len(existing_emails), 'duplicates': duplicates, 'total': len(all_emails)})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/campaign/from/delete', methods=['POST'])
+@login_required
+def delete_from_email():
+    try:
+        data = request.get_json()
+        index = data.get('index')
+        
+        from_file = os.path.join(BASIC_FOLDER, 'from.txt')
+        with open(from_file, 'r') as f:
+            emails = [line.strip() for line in f if line.strip()]
+        
+        if 0 <= index < len(emails):
+            emails.pop(index)
+        
+        with open(from_file, 'w') as f:
+            for email in emails:
+                f.write(f"{email}\n")
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/campaign/from/clear', methods=['POST'])
+@login_required
+def clear_from_emails():
+    try:
+        from_file = os.path.join(BASIC_FOLDER, 'from.txt')
+        with open(from_file, 'w') as f:
+            f.write('')
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# Campaign Recipients Management
+@app.route('/api/campaign/recipients/list', methods=['GET'])
+@login_required
+def get_recipients():
+    try:
+        recipients_file = os.path.join(BASIC_FOLDER, 'emailx.txt')
+        if os.path.exists(recipients_file):
+            with open(recipients_file, 'r') as f:
+                emails = [line.strip() for line in f if line.strip() and '@' in line]
+                return jsonify({'success': True, 'emails': emails, 'count': len(emails)})
+        return jsonify({'success': True, 'emails': [], 'count': 0})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/campaign/recipients/bulk', methods=['POST'])
+@login_required
+def bulk_add_recipients():
+    try:
+        data = request.get_json()
+        new_emails = data.get('emails', [])
+        
+        recipients_file = os.path.join(BASIC_FOLDER, 'emailx.txt')
+        existing_emails = []
+        
+        if os.path.exists(recipients_file):
+            with open(recipients_file, 'r') as f:
+                existing_emails = [line.strip() for line in f if line.strip()]
+        
+        # Combine and remove duplicates
+        all_emails = list(set(existing_emails + new_emails))
+        duplicates = len(existing_emails) + len(new_emails) - len(all_emails)
+        
+        with open(recipients_file, 'w') as f:
+            for email in all_emails:
+                f.write(f"{email}\n")
+        
+        return jsonify({'success': True, 'added': len(all_emails) - len(existing_emails), 'duplicates': duplicates, 'total': len(all_emails)})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/campaign/recipients/delete', methods=['POST'])
+@login_required
+def delete_recipient():
+    try:
+        data = request.get_json()
+        index = data.get('index')
+        
+        recipients_file = os.path.join(BASIC_FOLDER, 'emailx.txt')
+        with open(recipients_file, 'r') as f:
+            emails = [line.strip() for line in f if line.strip()]
+        
+        if 0 <= index < len(emails):
+            emails.pop(index)
+        
+        with open(recipients_file, 'w') as f:
+            for email in emails:
+                f.write(f"{email}\n")
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/campaign/recipients/clear', methods=['POST'])
+@login_required
+def clear_recipients():
+    try:
+        recipients_file = os.path.join(BASIC_FOLDER, 'emailx.txt')
+        with open(recipients_file, 'w') as f:
+            f.write('')
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/campaign/start', methods=['POST'])
 @login_required
 def start_campaign():
@@ -341,6 +491,64 @@ def start_campaign():
         return jsonify({'success': False, 'error': 'Campaign already running'}), 400
     
     try:
+        # Load configuration
+        config_file = os.path.join(BASIC_FOLDER, 'config.ini')
+        import configparser
+        config = configparser.ConfigParser()
+        config.read(config_file)
+        
+        # Load from emails
+        from_file = os.path.join(BASIC_FOLDER, 'from.txt')
+        if not os.path.exists(from_file):
+            return jsonify({'success': False, 'error': 'No from emails configured'}), 400
+        with open(from_file, 'r') as f:
+            from_emails = [line.strip() for line in f if line.strip() and '@' in line]
+        
+        if not from_emails:
+            return jsonify({'success': False, 'error': 'No from emails found'}), 400
+        
+        # Load recipients
+        recipients_file = os.path.join(BASIC_FOLDER, 'emailx.txt')
+        if not os.path.exists(recipients_file):
+            return jsonify({'success': False, 'error': 'No recipients configured'}), 400
+        with open(recipients_file, 'r') as f:
+            recipients = [line.strip() for line in f if line.strip() and '@' in line]
+        
+        if not recipients:
+            return jsonify({'success': False, 'error': 'No recipients found'}), 400
+        
+        # Load SMTP servers (only active ones)
+        smtp_file = os.path.join(BASIC_FOLDER, 'smtp.txt')
+        if not os.path.exists(smtp_file):
+            return jsonify({'success': False, 'error': 'No SMTP servers configured'}), 400
+        
+        smtp_servers = []
+        with open(smtp_file, 'r') as f:
+            lines = f.readlines()[1:]  # Skip header
+            for line in lines:
+                if line.strip():
+                    parts = line.strip().split(',')
+                    if len(parts) >= 5:
+                        smtp_servers.append({
+                            'host': parts[0].strip(),
+                            'port': parts[1].strip(),
+                            'username': parts[2].strip(),
+                            'password': parts[3].strip(),
+                            'status': parts[4].strip() if len(parts) > 4 else 'inactive',
+                            'sent': int(parts[5].strip()) if len(parts) > 5 else 0
+                        })
+        
+        active_smtps = [s for s in smtp_servers if s['status'] == 'active']
+        if not active_smtps:
+            return jsonify({'success': False, 'error': 'No active SMTP servers found'}), 400
+        
+        # Load HTML template
+        html_file = os.path.join(BASIC_FOLDER, config['Settings'].get('LETTERPATH', 'ma.html'))
+        if not os.path.exists(html_file):
+            return jsonify({'success': False, 'error': 'HTML template not found'}), 400
+        with open(html_file, 'rb') as f:
+            html_content = f.read().decode('utf-8')
+        
         campaign_stats = {
             'total_sent': 0,
             'total_failed': 0,
@@ -349,13 +557,16 @@ def start_campaign():
         }
         
         # Start the campaign in a separate thread
-        thread = threading.Thread(target=run_campaign_background)
+        thread = threading.Thread(
+            target=run_campaign_background,
+            args=(recipients, from_emails, smtp_servers, html_content, config['Settings'])
+        )
         thread.daemon = True
         thread.start()
         
         campaign_running = True
         
-        return jsonify({'success': True, 'message': 'Campaign started successfully'})
+        return jsonify({'success': True, 'message': f'Campaign started: {len(recipients)} recipients, {len(active_smtps)} active SMTPs'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -369,13 +580,12 @@ def stop_campaign():
     
     try:
         if campaign_process:
-            campaign_process.terminate()
-            campaign_process = None
+            campaign_process.stop()
         
         campaign_running = False
         campaign_stats['status'] = 'stopped'
         
-        socketio.emit('campaign_stopped', campaign_stats)
+        socketio.emit('campaign_log', {'message': 'Campaign stopped by user', 'type': 'warning'})
         
         return jsonify({'success': True, 'message': 'Campaign stopped successfully'})
     except Exception as e:
@@ -390,47 +600,72 @@ def get_campaign_stats():
         'running': campaign_running
     })
 
-def run_campaign_background():
-    """Run the mainnotall.py script in background"""
+def run_campaign_background(recipients, from_emails, smtp_servers, html_content, config_settings):
+    """Run campaign using campaign_sender module"""
     global campaign_process, campaign_running, campaign_stats
     
     try:
-        script_path = os.path.join(BASIC_FOLDER, 'mainnotall.py')
+        from campaign_sender import CampaignSender
         
-        # Change to Basic directory to run the script
-        os.chdir(BASIC_FOLDER)
+        def campaign_callback(event):
+            """Handle campaign events"""
+            if event['type'] == 'log':
+                socketio.emit('campaign_log', {'message': event['message'], 'type': event['log_type']})
+            elif event['type'] == 'stats':
+                campaign_stats['total_sent'] = event['sent']
+                campaign_stats['total_failed'] = event['failed']
+                socketio.emit('campaign_stats', {'sent': event['sent'], 'failed': event['failed']})
+            elif event['type'] == 'complete':
+                # Update SMTP sent counts in smtp.txt
+                update_smtp_sent_counts(event.get('smtp_stats', {}))
+                campaign_stats['status'] = 'completed'
+                socketio.emit('campaign_complete', {'sent': event['sent'], 'failed': event['failed']})
         
-        campaign_process = subprocess.Popen(
-            ['python', 'mainnotall.py'],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            bufsize=1
+        # Create campaign sender instance
+        sender = CampaignSender(config_settings, campaign_callback)
+        campaign_process = sender
+        
+        # Run campaign
+        sender.send_campaign(
+            recipients=recipients,
+            from_emails=from_emails,
+            smtp_servers=smtp_servers,
+            html_content=html_content,
+            subject=config_settings.get('subject', 'Important Message'),
+            sender_name=config_settings.get('SENDERNAME', 'Support')
         )
         
-        # Monitor the process output
-        for line in campaign_process.stdout:
-            if line:
-                # Parse output and emit via websocket
-                socketio.emit('campaign_log', {'message': line.strip()})
-                
-                # Update stats (you can parse the output for specific info)
-                if 'successfully' in line.lower():
-                    campaign_stats['total_sent'] += 1
-                elif 'failed' in line.lower() or 'error' in line.lower():
-                    campaign_stats['total_failed'] += 1
-                
-                socketio.emit('campaign_stats', campaign_stats)
-        
-        campaign_process.wait()
-        
     except Exception as e:
-        socketio.emit('campaign_error', {'error': str(e)})
+        socketio.emit('campaign_log', {'message': f'Campaign error: {str(e)}', 'type': 'error'})
+        campaign_stats['status'] = 'error'
     finally:
         campaign_running = False
-        campaign_stats['status'] = 'completed'
-        socketio.emit('campaign_completed', campaign_stats)
-        os.chdir('..')  # Return to root directory
+        campaign_process = None
+
+def update_smtp_sent_counts(smtp_stats):
+    """Update SMTP sent counts in smtp.txt"""
+    try:
+        smtp_file = os.path.join(BASIC_FOLDER, 'smtp.txt')
+        if not os.path.exists(smtp_file):
+            return
+        
+        with open(smtp_file, 'r') as f:
+            lines = f.readlines()
+        
+        # Update sent counts
+        with open(smtp_file, 'w') as f:
+            f.write(lines[0])  # Header
+            for line in lines[1:]:
+                if line.strip():
+                    parts = line.strip().split(',')
+                    if len(parts) >= 4:
+                        username = parts[2].strip()
+                        current_sent = int(parts[5].strip()) if len(parts) > 5 else 0
+                        new_sent = current_sent + smtp_stats.get(username, 0)
+                        status = parts[4].strip() if len(parts) > 4 else 'inactive'
+                        f.write(f"{parts[0]},{parts[1]},{parts[2]},{parts[3]},{status},{new_sent}\n")
+    except Exception as e:
+        print(f"Error updating SMTP counts: {e}")
 
 # WebSocket events
 @socketio.on('connect')
