@@ -1095,21 +1095,27 @@ def start_sending_campaign():
         def campaign_callback(event):
             try:
                 event_type = event.get('type')
+                print(f"[CALLBACK] Type: {event_type}, Message: {event.get('message', 'N/A')}")
                 if event_type == 'sending_campaign_log':
                     socketio.emit('sending_campaign_log', {
                         'message': event['message'],
                         'log_type': event.get('log_type', 'info')
                     })
+                    print(f"[CALLBACK] Emitted sending_campaign_log")
                 elif event_type == 'sending_campaign_stats':
                     socketio.emit('sending_campaign_stats', {
                         'sent': event['sent']
                     })
+                    print(f"[CALLBACK] Emitted sending_campaign_stats: {event['sent']}")
                 elif event_type == 'sending_campaign_complete':
                     socketio.emit('sending_campaign_complete', {
                         'message': event['message']
                     })
+                    print(f"[CALLBACK] Emitted sending_campaign_complete")
             except Exception as e:
-                print(f"Error in campaign callback: {e}")
+                print(f"[CALLBACK ERROR] {e}")
+                import traceback
+                traceback.print_exc()
         
         # Store callback for thread access
         global sending_campaign_callback
@@ -1146,14 +1152,19 @@ def run_sending_campaign():
     """Background thread for sending campaign"""
     global sending_campaign_running, sending_campaign_callback
     
+    print(f"[THREAD START] run_sending_campaign started. Callback available: {sending_campaign_callback is not None}")
+    
     def emit_log(message, log_type='info'):
         """Helper to emit logs via callback"""
+        print(f"[EMIT_LOG] {message}")
         if sending_campaign_callback:
             sending_campaign_callback({
                 'type': 'sending_campaign_log',
                 'message': message,
                 'log_type': log_type
             })
+        else:
+            print(f"[EMIT_LOG WARNING] No callback available!")
     
     def emit_stats(sent):
         """Helper to emit stats via callback"""
