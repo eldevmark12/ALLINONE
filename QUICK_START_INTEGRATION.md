@@ -6,9 +6,9 @@
 import requests
 from datetime import datetime
 
-# API Configuration - CHANGE THE API_KEY!
+# API Configuration
 API_URL = "https://all-in-one-tdxd.onrender.com/api"
-API_KEY = "CHANGE_THIS_TO_YOUR_SECURE_KEY"  # ⚠️ Must match Render env var EMAIL_API_KEY
+API_KEY = "@oldisgold@"  # Fixed API key
 
 HEADERS = {
     "Authorization": f"Bearer {API_KEY}",
@@ -128,7 +128,7 @@ from datetime import datetime
 
 # Add API configuration
 API_URL = "https://all-in-one-tdxd.onrender.com/api"
-API_KEY = "your-secure-key-here"  # CHANGE THIS!
+API_KEY = "@oldisgold@"  # Fixed API key
 HEADERS = {
     "Authorization": f"Bearer {API_KEY}",
     "Content-Type": "application/json"
@@ -168,16 +168,19 @@ for account in accounts:
 
 ---
 
-## 🔐 Render Setup (Do this FIRST!)
+## 🔐 Render Setup (Optional - Already Configured)
 
+The API key is already set to `@oldisgold@` in the code. 
+
+If you want to change it for security:
 1. Go to: https://dashboard.render.com
 2. Select your **ALL-in-One** service
 3. Click **Environment** tab
 4. Add new variable:
    - Key: `EMAIL_API_KEY`
-   - Value: `sk_live_YOUR_SECURE_RANDOM_STRING_HERE`
+   - Value: `your-new-secure-key`
 5. Save (app will redeploy)
-6. **Copy that exact value** and use it as `API_KEY` in your script
+6. Update `API_KEY` in your monitoring script to match
 
 ---
 
@@ -233,8 +236,9 @@ After sending data, the **Sending** tab will show:
 ## 🐛 Common Issues
 
 **401 Unauthorized Error:**
-- API_KEY in your script doesn't match EMAIL_API_KEY in Render
-- Solution: Check both match exactly (including any spaces)
+- Make sure you're using `API_KEY = "@oldisgold@"` exactly as shown
+- Check for any extra spaces or typos
+- Solution: Copy the API_KEY from the examples above
 
 **Data not showing in portal:**
 - Make sure you're logged in
@@ -256,7 +260,7 @@ import time
 
 # Configuration
 API_URL = "https://all-in-one-tdxd.onrender.com/api"
-API_KEY = "sk_live_YOUR_KEY_HERE"  # CHANGE THIS!
+API_KEY = "@oldisgold@"  # Fixed API key
 HEADERS = {
     "Authorization": f"Bearer {API_KEY}",
     "Content-Type": "application/json"

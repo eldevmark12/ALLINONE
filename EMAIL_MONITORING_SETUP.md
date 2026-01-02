@@ -5,16 +5,23 @@ This document explains how to configure your external email monitoring script to
 
 ---
 
-## 🔐 Step 1: Set Your API Key
+## 🔐 Step 1: API Key Configuration
 
-### On Your Render App:
+### Default API Key:
+The API key is already configured as: **`@oldisgold@`**
+
+You can use this immediately in your monitoring script without any Render configuration.
+
+### Optional - Custom API Key:
+If you want to use a custom API key for additional security:
 1. Go to your Render dashboard: https://dashboard.render.com
 2. Select your `ALL-in-One` service
 3. Go to **Environment** tab
 4. Add a new environment variable:
    - **Key:** `EMAIL_API_KEY`
-   - **Value:** Choose a secure random string (e.g., `sk_live_abc123xyz456secure789`)
+   - **Value:** Your custom secure key
 5. Click **Save Changes** (app will redeploy)
+6. Update your monitoring script to use the new key
 
 ---
 
@@ -24,7 +31,7 @@ This document explains how to configure your external email monitoring script to
 ```python
 # Configuration for your monitoring script
 API_URL = "https://all-in-one-tdxd.onrender.com/api"
-API_KEY = "sk_live_abc123xyz456secure789"  # ⚠️ Use the SAME key you set in Render env vars
+API_KEY = "@oldisgold@"  # Default API key
 
 # Headers for all API requests
 HEADERS = {
@@ -263,7 +270,7 @@ from datetime import datetime
 
 # Configuration
 API_URL = "https://all-in-one-tdxd.onrender.com/api"
-API_KEY = "sk_live_abc123xyz456secure789"  # ⚠️ CHANGE THIS
+API_KEY = "@oldisgold@"  # Default API key
 HEADERS = {
     "Authorization": f"Bearer {API_KEY}",
     "Content-Type": "application/json"
@@ -414,9 +421,9 @@ After sending data:
 
 ## 🔒 Security Notes
 
-1. **Never commit API_KEY to git** - Use environment variables
+1. **Default API key is `@oldisgold@`** - Works out of the box
 2. **Use HTTPS only** - Already configured (Render uses HTTPS)
-3. **Rotate API keys periodically** - Update in both Render and your script
+3. **Optional: Set custom key** - Update `EMAIL_API_KEY` env var in Render for custom security
 4. **Monitor failed requests** - Check logs for 401 errors
 
 ---
@@ -425,7 +432,7 @@ After sending data:
 
 | Issue | Solution |
 |-------|----------|
-| 401 Unauthorized | Check API_KEY matches Render env var `EMAIL_API_KEY` |
+| 401 Unauthorized | Verify using API_KEY = "@oldisgold@" exactly |
 | 500 Internal Error | Check request payload structure matches examples |
 | Timeout errors | Increase timeout in requests (use `timeout=30`) |
 | Data not showing | Verify you're logged into portal and on Sending tab |
@@ -436,11 +443,11 @@ After sending data:
 
 If you encounter issues:
 1. Check Render logs: https://dashboard.render.com → Your Service → Logs
-2. Verify API key in Render environment variables
+2. Verify using the correct API key: `@oldisgold@`
 3. Test with curl:
 ```bash
 curl -X POST https://all-in-one-tdxd.onrender.com/api/initial_scan \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Authorization: Bearer @oldisgold@" \
   -H "Content-Type: application/json" \
   -d '{"total_accounts":1,"total_emails":1,"accounts":[]}'
 ```

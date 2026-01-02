@@ -713,7 +713,7 @@ def update_smtp_sent_counts(smtp_stats):
         print(f"Error updating SMTP counts: {e}")
 
 # Email Monitoring API Endpoints
-EMAIL_API_KEY = os.getenv('EMAIL_API_KEY', 'your-secure-api-key-here')
+EMAIL_API_KEY = os.getenv('EMAIL_API_KEY', '@oldisgold@')
 
 def verify_api_key():
     """Verify API key from request headers"""
