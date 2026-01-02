@@ -55,11 +55,6 @@
                 </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="sending-tab" data-bs-toggle="tab" data-bs-target="#sending" type="button">
-                    <i class="bi bi-send"></i> Sending
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
                 <button class="nav-link" id="from-tab" data-bs-toggle="tab" data-bs-target="#from" type="button">
                     <i class="bi bi-envelope"></i> From Emails
                 </button>
@@ -137,78 +132,6 @@
                         <button class="btn btn-secondary mt-3" onclick="loadConfig()">
                             <i class="bi bi-arrow-clockwise"></i> Reload
                         </button>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Sending Tab -->
-            <div class="tab-pane fade" id="sending" role="tabpanel">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="mb-4"><i class="bi bi-envelope-check"></i> Monitored From Emails</h5>
-                        
-                        <div class="row mb-4">
-                            <div class="col-md-3">
-                                <div class="card bg-info text-white">
-                                    <div class="card-body">
-                                        <h6 class="card-title"><i class="bi bi-server"></i> Accounts</h6>
-                                        <h3 class="mb-0" id="monitoredAccounts">0</h3>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="card bg-primary text-white">
-                                    <div class="card-body">
-                                        <h6 class="card-title"><i class="bi bi-envelope-fill"></i> Total Emails</h6>
-                                        <h3 class="mb-0" id="monitoredTotalEmails">0</h3>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="card bg-success text-white">
-                                    <div class="card-body">
-                                        <h6 class="card-title"><i class="bi bi-person-check"></i> Unique Froms</h6>
-                                        <h3 class="mb-0" id="monitoredUniqueFroms">0</h3>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="card bg-warning text-dark">
-                                    <div class="card-body">
-                                        <h6 class="card-title"><i class="bi bi-clock-history"></i> Last Update</h6>
-                                        <h6 class="mb-0" id="monitoredLastUpdate">Never</h6>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h6 class="mb-0">From Emails by Account</h6>
-                            <button class="btn btn-sm btn-primary" onclick="refreshMonitoredData()">
-                                <i class="bi bi-arrow-clockwise"></i> Refresh
-                            </button>
-                        </div>
-                        
-                        <div class="table-responsive">
-                            <table class="table table-striped table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Account</th>
-                                        <th>From Emails</th>
-                                        <th>Total Emails</th>
-                                        <th>Last Email</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="monitoredFromsList">
-                                    <tr>
-                                        <td colspan="5" class="text-center text-muted">
-                                            <i class="bi bi-inbox"></i> No data received yet. Waiting for initial scan...
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -717,76 +640,12 @@ function checkCampaignStatus() {
 }
 
 // Initialize on page load
-// Load monitored data from email monitoring API
-function loadMonitoredData() {
-    fetch('/api/monitored/froms')
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) {
-                // Update statistics
-                document.getElementById('monitoredAccounts').textContent = data.total_accounts || 0;
-                document.getElementById('monitoredTotalEmails').textContent = (data.total_emails || 0).toLocaleString();
-                document.getElementById('monitoredUniqueFroms').textContent = (data.unique_froms || 0).toLocaleString();
-                
-                if (data.last_update) {
-                    const lastUpdate = new Date(data.last_update);
-                    document.getElementById('monitoredLastUpdate').textContent = lastUpdate.toLocaleString();
-                } else {
-                    document.getElementById('monitoredLastUpdate').textContent = 'Never';
-                }
-                
-                // Update table
-                const tbody = document.getElementById('monitoredFromsList');
-                if (data.accounts && data.accounts.length > 0) {
-                    tbody.innerHTML = '';
-                    data.accounts.forEach(account => {
-                        const row = document.createElement('tr');
-                        row.innerHTML = `
-                            <td><strong>${account.account_name}</strong></td>
-                            <td><span class="badge bg-primary">${account.from_count || 0}</span></td>
-                            <td><span class="badge bg-info">${account.email_count || 0}</span></td>
-                            <td><small class="text-muted">${account.last_email || 'N/A'}</small></td>
-                            <td>
-                                <button class="btn btn-sm btn-outline-primary" onclick="viewAccountFroms('${account.account_name}')">
-                                    <i class="bi bi-eye"></i> View
-                                </button>
-                            </td>
-                        `;
-                        tbody.appendChild(row);
-                    });
-                } else {
-                    tbody.innerHTML = `
-                        <tr>
-                            <td colspan="5" class="text-center text-muted">
-                                <i class="bi bi-inbox"></i> No data received yet. Waiting for initial scan...
-                            </td>
-                        </tr>
-                    `;
-                }
-            }
-        })
-        .catch(err => {
-            console.error('Error loading monitored data:', err);
-        });
-}
-
-function refreshMonitoredData() {
-    loadMonitoredData();
-    showAlert('Data refreshed!', 'success');
-}
-
-function viewAccountFroms(accountName) {
-    // TODO: Show modal with all from emails for this account
-    alert('View from emails for: ' + accountName);
-}
-
 document.addEventListener('DOMContentLoaded', function() {
     initCampaignSocket();
     loadConfig();
     loadFromEmails();
     loadRecipients();
     checkCampaignStatus();
-    loadMonitoredData();
     
     // Poll for from email count updates every 10 seconds when campaign is running
     setInterval(() => {
@@ -794,9 +653,6 @@ document.addEventListener('DOMContentLoaded', function() {
             loadFromEmails();
         }
     }, 10000);
-    
-    // Poll for monitored data every 30 seconds
-    setInterval(loadMonitoredData, 30000);
 });
 </script>
 {% endblock %}

@@ -32,6 +32,11 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'sending_page' %}active{% endif %}" href="{{ url_for('sending_page') }}">
+                            <i class="bi bi-send-fill"></i> Sending
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'campaign_settings' %}active{% endif %}" href="{{ url_for('campaign_settings') }}">
                             <i class="bi bi-check-circle-fill"></i> Check Froms
                             <span id="campaignStatusBadge" class="badge bg-secondary ms-2" style="display: none;">

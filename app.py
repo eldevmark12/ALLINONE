@@ -105,6 +105,11 @@ def template_editor():
 def campaign_settings():
     return render_template('campaign.html')
 
+@app.route('/sending')
+@login_required
+def sending_page():
+    return render_template('sending.html')
+
 # API Routes
 @app.route('/api/health')
 def health():
