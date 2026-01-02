@@ -408,9 +408,8 @@ print(f"Response: {response.json()}")
 
 After sending data:
 1. Login to: https://all-in-one-tdxd.onrender.com
-2. Go to: **Check Froms** tab
-3. Click on: **Sending** tab
-4. You'll see:
+2. Click on: **Sending** in the header navigation
+3. You'll see:
    - Total accounts monitored
    - Total emails tracked
    - Unique from emails
@@ -435,7 +434,7 @@ After sending data:
 | 401 Unauthorized | Verify using API_KEY = "@oldisgold@" exactly |
 | 500 Internal Error | Check request payload structure matches examples |
 | Timeout errors | Increase timeout in requests (use `timeout=30`) |
-| Data not showing | Verify you're logged into portal and on Sending tab |
+| Data not showing | Verify you're logged into portal, click **Sending** in header |
 
 ---
 

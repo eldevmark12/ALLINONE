@@ -217,14 +217,14 @@ send_new_email_to_portal("test-account-1", test_email)
 
 Then check portal at: https://all-in-one-tdxd.onrender.com
 - Login
-- Go to **Check Froms** → **Sending** tab
+- Go to **Sending** page (in main header navigation)
 - You should see your test data!
 
 ---
 
 ## 📊 What You'll See in Portal
 
-After sending data, the **Sending** tab will show:
+After sending data, the **Sending** page will show:
 - 📊 **Accounts**: Number of email accounts monitored
 - 📧 **Total Emails**: Total emails tracked
 - 👤 **Unique Froms**: Number of unique sender emails
@@ -242,7 +242,7 @@ After sending data, the **Sending** tab will show:
 
 **Data not showing in portal:**
 - Make sure you're logged in
-- Navigate to Check Froms → Sending tab
+- Navigate to **Sending** page in the header
 - Click Refresh button
 
 **Timeout errors:**
