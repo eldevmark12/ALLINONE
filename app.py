@@ -615,6 +615,7 @@ def run_campaign_background(recipients, from_emails, smtp_servers, html_content,
         
         def campaign_callback(event):
             """Handle campaign events"""
+            global campaign_logs, campaign_stats, campaign_running
             timestamp = datetime.now().strftime('%H:%M:%S')
             log_entry = {'time': timestamp, 'message': '', 'type': 'info'}
             
@@ -624,7 +625,7 @@ def run_campaign_background(recipients, from_emails, smtp_servers, html_content,
                 with campaign_lock:
                     campaign_logs.append(log_entry)
                     if len(campaign_logs) > 1000:  # Keep last 1000 logs
-                        campaign_logs = campaign_logs[-1000:]
+                        del campaign_logs[:-1000]
                 socketio.emit('campaign_log', {'message': event['message'], 'type': event['log_type']})
                 
             elif event['type'] == 'stats':
