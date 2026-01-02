@@ -952,6 +952,33 @@ def toggle_from_status():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/sending/bulk_toggle', methods=['POST'])
+@login_required
+def bulk_toggle_from_status():
+    """Toggle multiple from emails between active and inactive"""
+    try:
+        data = request.json
+        emails = data.get('emails', [])
+        new_status = data.get('status')
+        
+        if not emails or new_status not in ['active', 'inactive']:
+            return jsonify({'success': False, 'error': 'Invalid parameters'}), 400
+        
+        # Load current status
+        status_dict = load_from_status()
+        
+        # Update all emails
+        for email in emails:
+            status_dict[email] = new_status
+        
+        # Save
+        if save_from_status(status_dict):
+            return jsonify({'success': True, 'count': len(emails)})
+        else:
+            return jsonify({'success': False, 'error': 'Failed to save status'}), 500
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/sending/save_settings', methods=['POST'])
 @login_required
 def save_sending_settings():
@@ -1150,6 +1177,31 @@ def run_sending_campaign():
         sent_count = 0
         from_index = 0
         
+        # Load SMTP servers from Check Froms
+        smtp_file = os.path.join('Basic', 'smtp.txt')
+        smtp_servers = []
+        if os.path.exists(smtp_file):
+            with open(smtp_file, 'r') as f:
+                for line in f:
+                    parts = line.strip().split(',')
+                    if len(parts) >= 4:
+                        smtp_servers.append({
+                            'host': parts[0],
+                            'port': parts[1],
+                            'username': parts[2],
+                            'password': parts[3]
+                        })
+        
+        if not smtp_servers:
+            socketio.emit('sending_campaign_log', {
+                'message': 'No SMTP servers available. Add SMTP servers in Check Froms tab.',
+                'type': 'error'
+            })
+            sending_campaign_running = False
+            return
+        
+        smtp_index = 0  # For round-robin SMTP selection
+        
         for recipient in recipients:
             if not sending_campaign_running:
                 break
@@ -1158,15 +1210,47 @@ def run_sending_campaign():
             current_from = filtered_from_emails[from_index]
             from_index = (from_index + 1) % len(filtered_from_emails)
             
-            # TODO: Actually send email here using SMTP
-            # For now, just simulate sending
-            socketio.emit('sending_campaign_log', {
-                'message': f'Sent to {recipient} from {current_from}',
-                'type': 'success'
-            })
+            # Get next SMTP server (round-robin)
+            smtp_server = smtp_servers[smtp_index]
+            smtp_index = (smtp_index + 1) % len(smtp_servers)
             
-            sent_count += 1
-            socketio.emit('sending_campaign_stats', {'sent': sent_count})
+            # Actually send email using SMTP
+            try:
+                import smtplib
+                from email.mime.text import MIMEText
+                from email.mime.multipart import MIMEMultipart
+                import email.utils
+                import uuid
+                
+                msg = MIMEMultipart("alternative")
+                msg['From'] = f'{sender_name} <{current_from}>' if sender_name else current_from
+                msg['To'] = recipient
+                msg['Date'] = email.utils.formatdate(localtime=True)
+                msg['Subject'] = subject
+                msg["Message-ID"] = f"<{str(uuid.uuid4())}@sending.portal>"
+                
+                # Attach message
+                msg.attach(MIMEText(message, 'html'))
+                
+                # Connect and send
+                with smtplib.SMTP(smtp_server['host'], int(smtp_server['port']), timeout=30) as server:
+                    server.starttls()
+                    server.login(smtp_server['username'], smtp_server['password'])
+                    server.send_message(msg)
+                
+                socketio.emit('sending_campaign_log', {
+                    'message': f'✉️ Sent to {recipient} from {current_from}',
+                    'type': 'success'
+                })
+                
+                sent_count += 1
+                socketio.emit('sending_campaign_stats', {'sent': sent_count})
+                
+            except Exception as e:
+                socketio.emit('sending_campaign_log', {
+                    'message': f'❌ Failed to send to {recipient}: {str(e)[:100]}',
+                    'type': 'error'
+                })
             
             time.sleep(sleep_time)
         
