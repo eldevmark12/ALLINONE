@@ -80,6 +80,28 @@
                         
                         <div class="row">
                             <div class="col-md-6 mb-3">
+                                <label class="form-label">Sender Name</label>
+                                <input type="text" class="form-control" id="sendername" placeholder="Support">
+                                <small class="text-muted">Display name for sender</small>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Subject</label>
+                                <input type="text" class="form-control" id="subject" placeholder="Important Notice">
+                                <small class="text-muted">Email subject line</small>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label">Message</label>
+                                <textarea class="form-control" id="message" rows="5" placeholder="Enter your email message here..."></textarea>
+                                <small class="text-muted">Email message body</small>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
                                 <label class="form-label">Domain From</label>
                                 <input type="text" class="form-control" id="domainfrom" placeholder="charter.net">
                             </div>
@@ -334,6 +356,9 @@ function loadConfig() {
         .then(data => {
             if (data.success) {
                 const config = data.config;
+                document.getElementById('sendername').value = config.sendername || '';
+                document.getElementById('subject').value = config.subject || '';
+                document.getElementById('message').value = config.message || '';
                 document.getElementById('domainfrom').value = config.domainfrom || '';
                 document.getElementById('domainauth').value = config.domain_authentication || '';
                 document.getElementById('sleeptime').value = config.sleeptime || '';
@@ -348,6 +373,9 @@ function loadConfig() {
 // Save configuration
 function saveConfig() {
     const settings = {
+        sendername: document.getElementById('sendername').value,
+        subject: document.getElementById('subject').value,
+        message: document.getElementById('message').value,
         domainfrom: document.getElementById('domainfrom').value,
         domain_authentication: document.getElementById('domainauth').value,
         sleeptime: document.getElementById('sleeptime').value,

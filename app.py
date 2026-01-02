@@ -606,6 +606,16 @@ def get_campaign_stats():
             'logs': campaign_logs[-100:]  # Return last 100 logs
         })
 
+@app.route('/api/campaign/status', methods=['GET'])
+@login_required
+def get_campaign_status():
+    """Simple endpoint to check if campaign is running"""
+    return jsonify({
+        'success': True,
+        'running': campaign_running,
+        'stats': campaign_stats
+    })
+
 def run_campaign_background(recipients, from_emails, smtp_servers, html_content, config_settings):
     """Run campaign using campaign_sender module"""
     global campaign_process, campaign_running, campaign_stats, campaign_logs
