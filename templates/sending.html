@@ -164,6 +164,15 @@
                                 <button class="btn btn-sm btn-secondary" onclick="moveAllToInactive()">
                                     <i class="bi bi-arrow-right-circle"></i> Move All to Inactive
                                 </button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteSelectedActive()">
+                                    <i class="bi bi-trash"></i> Delete Selected
+                                </button>
+                                <button class="btn btn-sm btn-dark" onclick="deleteAllActive()">
+                                    <i class="bi bi-trash-fill"></i> Delete All
+                                </button>
+                                <button class="btn btn-sm btn-info" onclick="copyAllActive()">
+                                    <i class="bi bi-clipboard"></i> Copy All
+                                </button>
                                 <button class="btn btn-sm btn-success" onclick="refreshActiveFroms()">
                                     <i class="bi bi-arrow-clockwise"></i> Refresh
                                 </button>
@@ -208,6 +217,15 @@
                                 </button>
                                 <button class="btn btn-sm btn-primary" onclick="moveAllToActive()">
                                     <i class="bi bi-arrow-left-circle"></i> Move All to Active
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteSelectedInactive()">
+                                    <i class="bi bi-trash"></i> Delete Selected
+                                </button>
+                                <button class="btn btn-sm btn-dark" onclick="deleteAllInactive()">
+                                    <i class="bi bi-trash-fill"></i> Delete All
+                                </button>
+                                <button class="btn btn-sm btn-info" onclick="copyAllInactive()">
+                                    <i class="bi bi-clipboard"></i> Copy All
                                 </button>
                                 <button class="btn btn-sm btn-secondary" onclick="refreshInactiveFroms()">
                                     <i class="bi bi-arrow-clockwise"></i> Refresh
@@ -1275,6 +1293,158 @@ function bulkToggleStatus(emails, newStatus) {
 }
 
 // ========================================
+// DELETE AND COPY FUNCTIONS
+// ========================================
+
+function deleteSelectedActive() {
+    const checkboxes = document.querySelectorAll('#activeFromsList input[type="checkbox"]:checked');
+    if (checkboxes.length === 0) {
+        showSendingAlert('warning', 'No emails selected');
+        return;
+    }
+    if (!confirm(`Delete ${checkboxes.length} email(s) permanently?`)) return;
+    const emails = Array.from(checkboxes).map(cb => cb.value);
+    deleteFromEmails(emails);
+}
+
+function deleteSelectedInactive() {
+    const checkboxes = document.querySelectorAll('#inactiveFromsList input[type="checkbox"]:checked');
+    if (checkboxes.length === 0) {
+        showSendingAlert('warning', 'No emails selected');
+        return;
+    }
+    if (!confirm(`Delete ${checkboxes.length} email(s) permanently?`)) return;
+    const emails = Array.from(checkboxes).map(cb => cb.value);
+    deleteFromEmails(emails);
+}
+
+function deleteAllActive() {
+    let activeEmails = [];
+    Object.values(monitoredFroms).forEach(account => {
+        account.from_emails.forEach(fromEmail => {
+            if (fromEmail.status === 'active') {
+                activeEmails.push(fromEmail.email);
+            }
+        });
+    });
+    if (activeEmails.length === 0) {
+        showSendingAlert('warning', 'No active emails to delete');
+        return;
+    }
+    if (!confirm(`Delete ALL ${activeEmails.length} active email(s) permanently?`)) return;
+    deleteAllFromsByStatus('active');
+}
+
+function deleteAllInactive() {
+    let inactiveEmails = [];
+    Object.values(monitoredFroms).forEach(account => {
+        account.from_emails.forEach(fromEmail => {
+            if (fromEmail.status === 'inactive') {
+                inactiveEmails.push(fromEmail.email);
+            }
+        });
+    });
+    if (inactiveEmails.length === 0) {
+        showSendingAlert('warning', 'No inactive emails to delete');
+        return;
+    }
+    if (!confirm(`Delete ALL ${inactiveEmails.length} inactive email(s) permanently?`)) return;
+    deleteAllFromsByStatus('inactive');
+}
+
+function deleteFromEmails(emails) {
+    fetch('/api/sending/delete_froms', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({emails})
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            showSendingAlert('success', `Deleted ${data.deleted} email(s)`);
+            loadMonitoredFroms();
+            document.getElementById('selectAllActive').checked = false;
+            document.getElementById('selectAllInactive').checked = false;
+        } else {
+            showSendingAlert('danger', 'Error deleting emails');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showSendingAlert('danger', 'Network error');
+    });
+}
+
+function deleteAllFromsByStatus(status) {
+    fetch('/api/sending/delete_all_froms', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({status})
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            showSendingAlert('success', `Deleted ${data.deleted} ${status} email(s)`);
+            loadMonitoredFroms();
+        } else {
+            showSendingAlert('danger', 'Error deleting emails');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showSendingAlert('danger', 'Network error');
+    });
+}
+
+function copyAllActive() {
+    let activeEmails = [];
+    Object.values(monitoredFroms).forEach(account => {
+        account.from_emails.forEach(fromEmail => {
+            if (fromEmail.status === 'active') {
+                activeEmails.push(fromEmail.email);
+            }
+        });
+    });
+    if (activeEmails.length === 0) {
+        showSendingAlert('warning', 'No active emails to copy');
+        return;
+    }
+    copyToClipboard(activeEmails.join('\n'));
+    showSendingAlert('success', `Copied ${activeEmails.length} active emails to clipboard`);
+}
+
+function copyAllInactive() {
+    let inactiveEmails = [];
+    Object.values(monitoredFroms).forEach(account => {
+        account.from_emails.forEach(fromEmail => {
+            if (fromEmail.status === 'inactive') {
+                inactiveEmails.push(fromEmail.email);
+            }
+        });
+    });
+    if (inactiveEmails.length === 0) {
+        showSendingAlert('warning', 'No inactive emails to copy');
+        return;
+    }
+    copyToClipboard(inactiveEmails.join('\n'));
+    showSendingAlert('success', `Copied ${inactiveEmails.length} inactive emails to clipboard`);
+}
+
+function copyToClipboard(text) {
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(text);
+    } else {
+        // Fallback for older browsers
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+    }
+}
+
+// ========================================
 // RECHECK FROMS FUNCTIONS
 // ========================================
 
@@ -1430,6 +1600,9 @@ function startRecheckCountdown() {
             document.getElementById('stopRecheckBtn').style.display = 'none';
             document.getElementById('viewResultsBtn').style.display = 'inline-block';
             document.getElementById('closeRecheckModal').style.display = 'inline-block';
+            
+            // Prompt to swap results after countdown
+            promptSwapResults();
         }
     }, 1000);
 }
@@ -1479,6 +1652,53 @@ function viewRecheckResults() {
                 recheckResultsModal.show();
             }
         });
+}
+
+// Prompt to swap results (move old active to inactive, new working to active)
+function promptSwapResults() {
+    fetch('/api/recheck/results')
+        .then(res => res.json())
+        .then(data => {
+            if (data.success && data.results.working.length > 0) {
+                const working = data.results.working.length;
+                const msg = `✅ Found ${working} working from emails!\n\n` +
+                           `Do you want to:\n` +
+                           `• Move all OLD active emails → Inactive\n` +
+                           `• Move all NEW working emails → Active\n\n` +
+                           `This will replace your active froms with freshly verified ones.`;
+                
+                if (confirm(msg)) {
+                    swapRecheckResults();
+                } else {
+                    showAlert('recheckAlertContainer', 'You can manually manage results using "View Results" button', 'info');
+                }
+            }
+        });
+}
+
+// Execute swap (old active → inactive, new working → active)
+function swapRecheckResults() {
+    fetch('/api/recheck/swap_results', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('recheckAlertContainer', 
+                `✅ Swapped successfully!\n` +
+                `• ${data.moved_to_inactive} old emails → Inactive\n` +
+                `• ${data.moved_to_active} working emails → Active`, 
+                'success');
+            loadMonitoredFroms(); // Refresh the from lists
+        } else {
+            showAlert('recheckAlertContainer', data.message || 'Error swapping results', 'danger');
+        }
+    })
+    .catch(err => {
+        console.error('Swap error:', err);
+        showAlert('recheckAlertContainer', 'Network error while swapping results', 'danger');
+    });
 }
 
 // Render results tables

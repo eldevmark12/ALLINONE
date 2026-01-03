@@ -74,6 +74,39 @@ def set_from_status(email, status):
     status_dict[email] = status
     return save_from_status(status_dict)
 
+def ensure_single_status(email):
+    """Ensure email only exists in one status - remove duplicates"""
+    status_dict = load_from_status()
+    # Email can only have one status in the dict, but this helps clean up any issues
+    return status_dict.get(email)
+
+def remove_duplicates_from_status():
+    """Remove any duplicate entries and ensure each email has only one status"""
+    status_dict = load_from_status()
+    # JSON keys are unique by nature, so this is already handled
+    # But we can clean up any empty or invalid entries
+    cleaned = {k: v for k, v in status_dict.items() if k and '@' in k and v in ['active', 'inactive']}
+    save_from_status(cleaned)
+    return len(status_dict) - len(cleaned)  # Return number of duplicates removed
+
+def add_or_update_from_email(email, status='active'):
+    """Add new from_email or update if exists (prevents duplicates)"""
+    status_dict = load_from_status()
+    
+    # Check if exists
+    if email in status_dict:
+        # If exists and is inactive, activate it
+        if status_dict[email] == 'inactive' and status == 'active':
+            status_dict[email] = 'active'
+            save_from_status(status_dict)
+            return 'updated'  # Was inactive, now active
+        return 'exists'  # Already exists with same or different status
+    
+    # Add new email
+    status_dict[email] = status
+    save_from_status(status_dict)
+    return 'added'
+
 PASSWORD = os.getenv('PASSWORD', '@OLDISGOLD2026@')
 BASIC_FOLDER = 'Basic'
 
@@ -785,8 +818,12 @@ def initial_scan():
             monitored_data['total_emails'] = data.get('total_emails', 0)
             monitored_data['last_update'] = datetime.now().isoformat()
             
-            # Process accounts
+            # Process accounts and add from_emails
             accounts_data = data.get('accounts', [])
+            added_count = 0
+            updated_count = 0
+            skipped_count = 0
+            
             for account in accounts_data:
                 account_name = account.get('account_name')
                 monitored_data['accounts'][account_name] = {
@@ -796,6 +833,16 @@ def initial_scan():
                     'from_count': len(account.get('from_emails', [])),
                     'last_email': account['emails'][0]['date'] if account.get('emails') else None
                 }
+                
+                # Add from_emails to system (prevent duplicates, activate if inactive)
+                for from_email in account.get('from_emails', []):
+                    result = add_or_update_from_email(from_email, 'active')
+                    if result == 'added':
+                        added_count += 1
+                    elif result == 'updated':
+                        updated_count += 1
+                    else:
+                        skipped_count += 1
             
             # Calculate unique from emails across all accounts
             all_froms = set()
@@ -803,8 +850,9 @@ def initial_scan():
                 all_froms.update(account['from_emails'])
             monitored_data['unique_froms'] = len(all_froms)
         
-        print(f"✅ Initial scan received: {monitored_data['total_accounts']} accounts, {monitored_data['total_emails']} emails")
-        return jsonify({'status': 'success'}), 200
+        print(f"✅ Initial scan: {monitored_data['total_accounts']} accounts, {monitored_data['total_emails']} emails")
+        print(f"📧 From emails: {added_count} added, {updated_count} updated (inactive→active), {skipped_count} skipped")
+        return jsonify({'status': 'success', 'added': added_count, 'updated': updated_count, 'skipped': skipped_count}), 200
     except Exception as e:
         print(f"❌ Error processing initial scan: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
@@ -834,6 +882,11 @@ def new_email():
             if from_email and from_email not in monitored_data['accounts'][account_name]['from_emails']:
                 monitored_data['accounts'][account_name]['from_emails'].append(from_email)
                 monitored_data['accounts'][account_name]['from_count'] += 1
+                
+                # Add to system (prevent duplicates, activate if inactive)
+                result = add_or_update_from_email(from_email, 'active')
+                if result == 'updated':
+                    print(f"📧 From email {from_email} moved from inactive to active")
             
             # Add email to account
             email_data = {
@@ -1017,6 +1070,62 @@ def bulk_toggle_from_status():
             return jsonify({'success': True, 'count': len(emails)})
         else:
             return jsonify({'success': False, 'error': 'Failed to save status'}), 500
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/sending/delete_froms', methods=['POST'])
+@login_required
+def delete_from_emails():
+    """Delete selected from emails"""
+    try:
+        data = request.json
+        emails = data.get('emails', [])
+        
+        if not emails:
+            return jsonify({'success': False, 'error': 'No emails provided'}), 400
+        
+        # Load current status
+        status_dict = load_from_status()
+        
+        # Remove emails
+        deleted = 0
+        for email in emails:
+            if email in status_dict:
+                del status_dict[email]
+                deleted += 1
+        
+        # Save
+        if save_from_status(status_dict):
+            return jsonify({'success': True, 'deleted': deleted})
+        else:
+            return jsonify({'success': False, 'error': 'Failed to save'}), 500
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/sending/delete_all_froms', methods=['POST'])
+@login_required
+def delete_all_from_emails():
+    """Delete all from emails with specified status"""
+    try:
+        data = request.json
+        status_filter = data.get('status')
+        
+        if status_filter not in ['active', 'inactive']:
+            return jsonify({'success': False, 'error': 'Invalid status'}), 400
+        
+        # Load current status
+        status_dict = load_from_status()
+        
+        # Remove all with specified status
+        emails_to_delete = [email for email, status in status_dict.items() if status == status_filter]
+        for email in emails_to_delete:
+            del status_dict[email]
+        
+        # Save
+        if save_from_status(status_dict):
+            return jsonify({'success': True, 'deleted': len(emails_to_delete)})
+        else:
+            return jsonify({'success': False, 'error': 'Failed to save'}), 500
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -1249,6 +1358,54 @@ def save_recheck_configuration():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/recheck/remove_duplicates', methods=['POST'])
+@login_required
+def remove_from_duplicates():
+    """Remove duplicate from_emails before recheck"""
+    try:
+        removed = remove_duplicates_from_status()
+        return jsonify({'success': True, 'removed': removed})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/recheck/swap_results', methods=['POST'])
+@login_required
+def swap_recheck_results():
+    """Move old active to inactive, new working to active"""
+    try:
+        status_dict = load_from_status()
+        
+        # Get current active emails
+        old_active = [email for email, status in status_dict.items() if status == 'active']
+        
+        # Get working emails from recheck results
+        campaign_data = load_recheck_active()
+        if not campaign_data:
+            return jsonify({'success': False, 'message': 'No recheck results found'}), 400
+        
+        froms_tested = campaign_data.get('froms_tested', {})
+        working_emails = [email for email, data in froms_tested.items() if data.get('status') == 'working']
+        
+        if not working_emails:
+            return jsonify({'success': False, 'message': 'No working emails found in results'}), 400
+        
+        # Perform swap
+        for email in old_active:
+            status_dict[email] = 'inactive'
+        
+        for email in working_emails:
+            status_dict[email] = 'active'
+        
+        save_from_status(status_dict)
+        
+        return jsonify({
+            'success': True,
+            'moved_to_inactive': len(old_active),
+            'moved_to_active': len(working_emails)
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/recheck/start', methods=['POST'])
 @login_required
 def start_recheck_campaign():
@@ -1258,6 +1415,11 @@ def start_recheck_campaign():
     try:
         if recheck_campaign_running:
             return jsonify({'success': False, 'message': 'Recheck campaign already running'})
+        
+        # Remove duplicates before starting
+        removed = remove_duplicates_from_status()
+        if removed > 0:
+            print(f"🧹 Removed {removed} duplicate from_emails before recheck")
         
         # Load config
         config = load_recheck_config()
