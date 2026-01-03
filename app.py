@@ -1501,33 +1501,32 @@ def run_recheck_campaign():
         emit_log(f'📋 Testing {len(froms_tested)} from addresses', 'info')
         emit_log(f'📧 Sending to {len(recipients)} test recipients', 'info')
         
-        # Load SMTP servers and create lookup by username
+        # Load active SMTP servers (round-robin)
         smtp_file = os.path.join('Basic', 'smtp.txt')
-        smtp_lookup = {}  # username -> smtp config
+        smtp_servers = []
         if os.path.exists(smtp_file):
             with open(smtp_file, 'r') as f:
                 for line in f:
                     parts = line.strip().split(',')
                     if len(parts) >= 5 and parts[4] == 'active':
-                        username = parts[2].strip()
-                        smtp_lookup[username] = {
+                        smtp_servers.append({
                             'host': parts[0],
                             'port': parts[1],
-                            'username': username,
+                            'username': parts[2],
                             'password': parts[3]
-                        }
+                        })
         
-        if not smtp_lookup:
+        if not smtp_servers:
             emit_log('❌ No active SMTP servers available', 'error')
             recheck_campaign_running = False
             return
         
-        emit_log(f'📮 Loaded {len(smtp_lookup)} active SMTP credentials', 'info')
+        emit_log(f'📮 Using {len(smtp_servers)} active SMTP servers (round-robin)', 'info')
         
         # Send test emails
         sent_count = 0
         total_count = len(froms_tested)
-        skipped_count = 0
+        smtp_index = 0
         
         for from_email, from_data in froms_tested.items():
             if not recheck_campaign_running:
@@ -1536,14 +1535,9 @@ def run_recheck_campaign():
             
             unique_id = from_data['unique_id']
             
-            # Find matching SMTP server for this from_email
-            smtp_server = smtp_lookup.get(from_email)
-            if not smtp_server:
-                emit_log(f'⚠️ Skipping {from_email} - no matching SMTP credentials', 'warning')
-                skipped_count += 1
-                sent_count += 1
-                emit_progress(sent_count, total_count)
-                continue
+            # Use round-robin SMTP (authenticate with SMTP creds, but send FROM the from_email)
+            smtp_server = smtp_servers[smtp_index]
+            smtp_index = (smtp_index + 1) % len(smtp_servers)
             
             # Prepare message
             subject = config.get('subject', 'Verification {unique_id}')
@@ -1616,8 +1610,7 @@ def run_recheck_campaign():
                 time.sleep(1)
         
         # Campaign summary
-        successful_sends = sent_count - skipped_count
-        emit_log(f'✅ Sending complete! Sent: {successful_sends}, Skipped: {skipped_count}, Total: {total_count}', 'success')
+        emit_log(f'✅ Sending complete! Sent {sent_count}/{total_count} test emails', 'success')
         
         if recheck_campaign_callback:
             recheck_campaign_callback({'type': 'recheck_sending_complete'})
