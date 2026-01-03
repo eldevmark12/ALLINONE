@@ -1132,6 +1132,24 @@ function showSendingAlert(type, message) {
     }, 5000);
 }
 
+function showAlert(containerId, message, type = 'info') {
+    const alertContainer = document.getElementById(containerId);
+    if (!alertContainer) {
+        console.warn(`Alert container ${containerId} not found`);
+        return;
+    }
+    const alert = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    alertContainer.innerHTML = alert;
+    setTimeout(() => {
+        alertContainer.innerHTML = '';
+    }, 5000);
+}
+
 function showNotification(title, body) {
     if ('Notification' in window && Notification.permission === 'granted') {
         new Notification(title, { body: body });
@@ -1322,7 +1340,15 @@ function startRecheckCampaign() {
             throw new Error(data.message || 'Failed to save config');
         }
     })
-    .then(res => res.json())
+    .then(res => {
+        if (!res.ok) {
+            // Handle HTTP errors
+            return res.json().then(errData => {
+                throw new Error(errData.message || `HTTP ${res.status}: ${res.statusText}`);
+            });
+        }
+        return res.json();
+    })
     .then(data => {
         if (data.success) {
             // Show progress modal
@@ -1347,6 +1373,7 @@ function startRecheckCampaign() {
         }
     })
     .catch(err => {
+        console.error('Recheck error:', err);
         showAlert('recheckAlertContainer', err.message || 'Error starting campaign', 'danger');
     });
 }
