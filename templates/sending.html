@@ -2012,17 +2012,35 @@ function showRecheckFromSourceModal() {
 
 // Confirm and start recheck with selected source
 function confirmStartRecheck(fromSource) {
+    console.log('📍 Confirming start with source:', fromSource);
+    
     // Close the modal
-    const modal = bootstrap.Modal.getInstance(document.getElementById('recheckFromSourceModal'));
+    const modalElement = document.getElementById('recheckFromSourceModal');
+    const modal = bootstrap.Modal.getInstance(modalElement);
     if (modal) {
+        console.log('🚪 Closing from source modal...');
+        
+        // Wait for modal to fully hide before starting campaign
+        modalElement.addEventListener('hidden.bs.modal', function onModalHidden() {
+            console.log('✅ From source modal closed, starting campaign...');
+            modalElement.removeEventListener('hidden.bs.modal', onModalHidden);
+            
+            // Update the from_source dropdown
+            document.getElementById('recheckFromSource').value = fromSource;
+            
+            // Start the campaign
+            startRecheckCampaign();
+        }, { once: true });
+        
         modal.hide();
+    } else {
+        console.log('⚠️ Modal instance not found, starting campaign directly...');
+        // Update the from_source dropdown
+        document.getElementById('recheckFromSource').value = fromSource;
+        
+        // Start the campaign
+        startRecheckCampaign();
     }
-    
-    // Update the from_source dropdown
-    document.getElementById('recheckFromSource').value = fromSource;
-    
-    // Start the campaign
-    startRecheckCampaign();
 }
 
 // Start recheck campaign
@@ -2093,9 +2111,31 @@ function startRecheckCampaign() {
     .then(data => {
         console.log('✅ Campaign start response:', data);
         if (data.success) {
+            console.log('🎬 Showing progress modal...');
+            
+            // Get modal element
+            const modalElement = document.getElementById('recheckProgressModal');
+            if (!modalElement) {
+                console.error('❌ Modal element not found!');
+                showAlert('recheckAlertContainer', 'Error: Progress modal not found', 'danger');
+                return;
+            }
+            
+            console.log('✅ Modal element found, creating Bootstrap modal...');
+            
             // Show progress modal
-            recheckProgressModal = new bootstrap.Modal(document.getElementById('recheckProgressModal'));
-            recheckProgressModal.show();
+            try {
+                recheckProgressModal = new bootstrap.Modal(modalElement);
+                console.log('✅ Bootstrap modal created');
+                recheckProgressModal.show();
+                console.log('✅ Modal.show() called');
+            } catch (err) {
+                console.error('❌ Error creating/showing modal:', err);
+                showAlert('recheckAlertContainer', 'Error showing progress modal: ' + err.message, 'danger');
+                return;
+            }
+            
+            console.log('🔄 Resetting UI elements...');
             
             // Reset UI
             document.getElementById('recheckSendingProgress').style.width = '0%';
