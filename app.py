@@ -1725,9 +1725,14 @@ def run_recheck_campaign():
         """Worker function to send test email from one from_email"""
         unique_id = from_data['unique_id']
         
-        # Check if SMTP has too many failures
+        # Check if SMTP has too many failures or auth rejections
         if smtp_server.get('failures', 0) >= 5:
-            emit_log(f'⚠️ Skipping {smtp_server["host"]} (marked as failed after 5 errors)', 'warning')
+            emit_log(f'⚠️ Skipping {smtp_server["host"]} (connection failures)', 'warning')
+            return (from_email, False, from_data, smtp_server, True)
+        
+        if smtp_server.get('auth_failures', 0) >= 3:
+            emit_log(f'⚠️ Skipping {smtp_server["host"]} (rejects fake senders)', 'warning')
+            return (from_email, False, from_data, smtp_server, True)
             return (from_email, False, from_data, smtp_server, True)  # Return smtp_failed=True
         
         # Prepare message
@@ -1782,13 +1787,34 @@ def run_recheck_campaign():
             return (from_email, success, from_data, smtp_server, False)
             
         except Exception as e:
+            error_str = str(e).lower()
             smtp_error = True
-            smtp_server['failures'] = smtp_server.get('failures', 0) + 1
             
-            if smtp_server['failures'] >= 5:
-                emit_log(f'❌ SMTP {smtp_server["host"]} FAILED 5 times - MARKING AS INACTIVE', 'error')
+            # Check if it's an AUTH/SENDER rejection error (SMTP doesn't allow fake froms)
+            is_auth_error = any(x in error_str for x in [
+                'mail from must equal',
+                'sender address rejected',
+                'not permitted',
+                'authenticated sender',
+                'must match'
+            ])
+            
+            if is_auth_error:
+                smtp_server['auth_failures'] = smtp_server.get('auth_failures', 0) + 1
+                
+                if smtp_server['auth_failures'] >= 3:
+                    emit_log(f'❌ SMTP {smtp_server["host"]} rejects fake senders (3 auth errors) - MARKING AS INACTIVE', 'error')
+                    smtp_server['failures'] = 5  # Force immediate deactivation
+                else:
+                    emit_log(f'⚠️ {smtp_server["host"]} auth error ({smtp_server["auth_failures"]}/3): {str(e)[:80]}', 'warning')
             else:
-                emit_log(f'❌ SMTP error for {from_email} ({smtp_server["failures"]}/5 failures): {str(e)[:100]}', 'error')
+                # Regular connection/timeout errors
+                smtp_server['failures'] = smtp_server.get('failures', 0) + 1
+                
+                if smtp_server['failures'] >= 5:
+                    emit_log(f'❌ SMTP {smtp_server["host"]} FAILED 5 times - MARKING AS INACTIVE', 'error')
+                else:
+                    emit_log(f'❌ SMTP error for {from_email} ({smtp_server["failures"]}/5 failures): {str(e)[:100]}', 'error')
             
             import traceback
             print(f"[RECHECK ERROR] {traceback.format_exc()}")
@@ -1810,19 +1836,17 @@ def run_recheck_campaign():
         emit_log(f'📋 Testing {len(froms_tested)} from addresses', 'info')
         emit_log(f'📧 Sending to {len(recipients)} test recipients', 'info')
         
-        # Load ACTIVE SMTP servers from database (via API)
+        # Load ACTIVE SMTP servers from /smtp page database
         smtp_file = os.path.join('Basic', 'smtp.txt')
         smtp_servers = []
-        smtp_id_map = {}  # Map host to ID for status updates
         
-        # Load from smtp.txt (which is synced with /smtp page)
         if os.path.exists(smtp_file):
             with open(smtp_file, 'r') as f:
                 lines = f.readlines()
                 for i, line in enumerate(lines[1:], 1):  # Skip header
                     if line.strip():
                         parts = line.strip().split(',')
-                        if len(parts) >= 5 and parts[4] == 'active':
+                        if len(parts) >= 5 and parts[4].strip() == 'active':
                             smtp_servers.append({
                                 'id': i,
                                 'host': parts[0].strip(),
@@ -1831,16 +1855,16 @@ def run_recheck_campaign():
                                 'password': parts[3].strip(),
                                 'status': 'active',
                                 'sent': int(parts[5]) if len(parts) > 5 else 0,
-                                'failures': 0  # Track failures
+                                'failures': 0,
+                                'auth_failures': 0  # Track auth/sender rejections
                             })
-                            smtp_id_map[parts[0].strip()] = i
         
         if not smtp_servers:
-            emit_log('❌ No ACTIVE SMTP servers available. Please activate SMTPs at /smtp page', 'error')
+            emit_log('❌ No ACTIVE SMTPs found. Please activate SMTPs at /smtp page', 'error')
             recheck_campaign_running = False
             return
         
-        emit_log(f'✅ Loaded {len(smtp_servers)} ACTIVE SMTPs from database', 'success')
+        emit_log(f'✅ Loaded {len(smtp_servers)} ACTIVE SMTPs from /smtp page', 'success')
         
         # Get thread count from config (default 3)
         thread_count = config.get('threads', 3)
@@ -1857,21 +1881,23 @@ def run_recheck_campaign():
         count_lock = threading.Lock()
         
         def get_next_smtp():
-            """Thread-safe SMTP round-robin - skip failed SMTPs"""
+            """Thread-safe SMTP round-robin - skip failed and auth-rejected SMTPs"""
             nonlocal smtp_index
             with smtp_lock:
-                # Try to find a working SMTP (not failed 5 times)
+                # Try to find a working SMTP (not failed and doesn't reject auth)
                 attempts = 0
                 while attempts < len(smtp_servers):
                     smtp = smtp_servers[smtp_index]
                     smtp_index = (smtp_index + 1) % len(smtp_servers)
                     
-                    if smtp.get('failures', 0) < 5:
+                    # Skip if failed 5 times OR auth rejected 3 times
+                    if smtp.get('failures', 0) < 5 and smtp.get('auth_failures', 0) < 3:
                         return smtp
                     
                     attempts += 1
                 
                 # All SMTPs failed - return first one anyway (will be skipped in send function)
+                emit_log('⚠️ All SMTPs have been marked as failed! Check /smtp page', 'error')
                 return smtp_servers[0]
         
         # Prepare tasks
