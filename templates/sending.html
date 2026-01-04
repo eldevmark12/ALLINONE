@@ -1173,10 +1173,14 @@ function loadMonitoredFroms(renderLists = true) {
     return fetch('/api/monitored/froms')
         .then(response => {
             const fetchDuration = logPerformance('API fetch /api/monitored/froms', start);
+            console.log('✅ API response received, status:', response.status);
             return response.json();
         })
         .then(data => {
             const parseStart = performance.now();
+            console.log('📦 Received data from API:', data);
+            console.log('📦 Data keys:', Object.keys(data));
+            
             monitoredFroms = data;
             updateMonitoredCounts();
             
@@ -1222,14 +1226,25 @@ function updateMonitoredCounts() {
 
 function updateActiveFromsList() {
     const start = performance.now();
+    console.log('🔄 updateActiveFromsList() called');
+    console.log('📊 monitoredFroms data:', monitoredFroms);
+    console.log('📊 monitoredFroms keys:', Object.keys(monitoredFroms));
+    
     const tbody = document.getElementById('activeFromsList');
+    if (!tbody) {
+        console.error('❌ activeFromsList tbody not found!');
+        return;
+    }
+    
     tbody.innerHTML = '';
     
     let count = 0;
     
     let hasActive = false;
     Object.entries(monitoredFroms).forEach(([accountName, account]) => {
+        console.log(`📧 Account: ${accountName}, from_emails:`, account.from_emails);
         account.from_emails.forEach(fromEmail => {
+            console.log(`  📮 Email: ${fromEmail.email}, status: ${fromEmail.status}`);
             if (fromEmail.status === 'active') {
                 hasActive = true;
                 const row = `
@@ -1252,6 +1267,7 @@ function updateActiveFromsList() {
     });
     
     if (!hasActive) {
+        console.log('⚠️ No active froms found');
         tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted"><i class="bi bi-inbox"></i> No active from emails</td></tr>';
     }
     
