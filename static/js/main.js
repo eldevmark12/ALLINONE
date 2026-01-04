@@ -72,25 +72,29 @@ window.appUtils = {
     stopAutoRefresh
 };
 
-// Initialize Socket.IO connection with optimized settings
+// Initialize Socket.IO connection with optimized settings for render.com
 try {
     if (typeof io !== 'undefined') {
         window.socket = io({
-            transports: ['websocket', 'polling'],
+            transports: ['polling', 'websocket'],  // Start with polling for better compatibility
             reconnection: true,
             reconnectionDelay: 2000,
             reconnectionDelayMax: 10000,
             reconnectionAttempts: Infinity,
-            timeout: 20000,
+            timeout: 60000,  // Increased from 20s to 60s for render.com
             autoConnect: true,
             forceNew: false,
             multiplex: true,
             upgrade: true,
-            rememberUpgrade: true
+            rememberUpgrade: true,
+            // Additional render.com-specific settings
+            path: '/socket.io/',
+            secure: true,
+            rejectUnauthorized: false
         });
         
         socket.on('connect', function() {
-            console.log('✅ Socket.IO connected');
+            console.log('✅ Socket.IO connected (transport:', socket.io.engine.transport.name, ')');
         });
         
         socket.on('disconnect', function(reason) {
@@ -105,6 +109,7 @@ try {
         
         socket.on('connect_error', function(error) {
             console.error('❌ Socket.IO connection error:', error.message);
+            console.log('💡 Falling back to polling transport...');
         });
         
         socket.on('reconnect', function(attemptNumber) {
@@ -115,6 +120,11 @@ try {
             if (attemptNumber % 5 === 0) {
                 console.log('🔄 Reconnection attempt:', attemptNumber);
             }
+        });
+        
+        // Log transport upgrade
+        socket.io.on('upgrade', function(transport) {
+            console.log('⬆️ Transport upgraded to:', transport.name);
         });
     } else {
         console.warn('Socket.IO library not loaded');

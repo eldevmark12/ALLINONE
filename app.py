@@ -241,6 +241,17 @@ def save_smtp_list():
 @app.route('/api/smtp/validate', methods=['POST'])
 @login_required
 def validate_smtp():
+    global smtp_validation_running, smtp_validation_start_time, smtp_validation_stats
+    
+    # Check if validation is already running
+    if smtp_validation_running:
+        return jsonify({
+            'success': False, 
+            'error': 'SMTP validation already in progress',
+            'running': True,
+            'start_time': smtp_validation_start_time.isoformat() if smtp_validation_start_time else None
+        }), 400
+    
     try:
         data = request.get_json()
         servers = data.get('servers', [])
@@ -258,14 +269,41 @@ def validate_smtp():
                 'port': server['port']
             })
         
+        # Set validation running flag
+        smtp_validation_running = True
+        smtp_validation_start_time = datetime.now()
+        smtp_validation_stats = {
+            'total': len(accounts),
+            'sent': 0,
+            'failed': 0,
+            'validated': 0
+        }
+        
         # Start validation in background thread
         thread = threading.Thread(target=run_smtp_validation, args=(accounts,))
         thread.daemon = True
         thread.start()
         
-        return jsonify({'success': True, 'message': 'Validation started'})
+        return jsonify({
+            'success': True, 
+            'message': 'Validation started',
+            'total': len(accounts)
+        })
     except Exception as e:
+        smtp_validation_running = False
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/smtp/validation_status', methods=['GET'])
+@login_required
+def get_smtp_validation_status():
+    """Get current SMTP validation status"""
+    global smtp_validation_running, smtp_validation_start_time, smtp_validation_stats
+    
+    return jsonify({
+        'running': smtp_validation_running,
+        'start_time': smtp_validation_start_time.isoformat() if smtp_validation_start_time else None,
+        'stats': smtp_validation_stats
+    })
 
 def run_smtp_validation(accounts):
     """Run SMTP validation in background
@@ -276,29 +314,37 @@ def run_smtp_validation(accounts):
     - Recheck campaign (controlled by recheck_campaign_running flag)
     - Sending campaign (controlled by sending_campaign_running flag)
     """
+    global smtp_validation_running, smtp_validation_stats
+    
     validation_stats = {
         'total': len(accounts),
         'sent': 0,
         'failed': 0,
         'validated': 0
     }
+    smtp_validation_stats = validation_stats.copy()
     
     try:
         from smtp_validator import validate_smtp_accounts
         
         def validation_callback(event):
+            global smtp_validation_stats
             try:
                 if event['type'] == 'success':
                     validation_stats['sent'] += 1
+                    smtp_validation_stats['sent'] = validation_stats['sent']
                     socketio.emit('validation_log', {'message': f"✓ Sent test from {event['email']}"})
                     socketio.emit('validation_stats', validation_stats)
                     
                 elif event['type'] == 'error':
                     validation_stats['failed'] += 1
+                    smtp_validation_stats['failed'] = validation_stats['failed']
                     socketio.emit('validation_log', {'message': f"✗ Failed {event['email']}: {event.get('error', 'Unknown')}"})
                     socketio.emit('validation_stats', validation_stats)
                     
                 elif event['type'] == 'validated':
+                    validation_stats['validated'] += 1
+                    smtp_validation_stats['validated'] = validation_stats['validated']
                     socketio.emit('validation_log', {'message': f"✓ Validated {event['email']} (found in {event['folder']})"})
                     
                 elif event['type'] == 'info':
@@ -309,6 +355,7 @@ def run_smtp_validation(accounts):
                     
                 elif event['type'] == 'complete':
                     validation_stats['validated'] = event['validated']
+                    smtp_validation_stats['validated'] = event['validated']
                     socketio.emit('validation_log', {'message': f"✅ Complete: {event['validated']}/{event['total']} validated"})
                     socketio.emit('validation_stats', validation_stats)
                     
@@ -345,9 +392,18 @@ def run_smtp_validation(accounts):
         # Emit completion event
         socketio.emit('validation_complete', {'validated': len(validated_emails), 'total': len(accounts)})
         
+        print("✅ SMTP validation complete")
+        
     except Exception as e:
-        print(f"Validation error: {e}")
+        print(f"❌ SMTP validation error: {e}")
+        import traceback
+        traceback.print_exc()
         socketio.emit('validation_log', {'message': f'Error: {str(e)}'})
+    finally:
+        # Clear validation running flag
+        smtp_validation_running = False
+        smtp_validation_start_time = None
+        print("🏁 SMTP validation flag cleared")
 
 @app.route('/api/emails/list', methods=['GET'])
 @login_required
@@ -1059,6 +1115,11 @@ sending_settings_file = os.path.join('Basic', 'sending_config.ini')
 sending_campaign_running = False
 sending_campaign_thread = None
 sending_campaign_callback = None
+
+# SMTP validation state
+smtp_validation_running = False
+smtp_validation_start_time = None
+smtp_validation_stats = {}
 
 @app.route('/api/sending/toggle_from', methods=['POST'])
 @login_required

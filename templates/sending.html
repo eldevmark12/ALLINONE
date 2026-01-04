@@ -1298,8 +1298,6 @@ function updateMonitoredCounts() {
 function updateActiveFromsList() {
     const start = performance.now();
     console.log('🔄 updateActiveFromsList() called');
-    console.log('📊 monitoredFroms data:', monitoredFroms);
-    console.log('📊 monitoredFroms keys:', Object.keys(monitoredFroms));
     
     const tbody = document.getElementById('activeFromsList');
     if (!tbody) {
@@ -1307,39 +1305,43 @@ function updateActiveFromsList() {
         return;
     }
     
-    tbody.innerHTML = '';
-    
+    // Use DocumentFragment for batch DOM updates (MUCH faster)
+    const fragment = document.createDocumentFragment();
     let count = 0;
-    
     let hasActive = false;
+    
     Object.entries(monitoredFroms).forEach(([accountName, account]) => {
-        console.log(`📧 Account: ${accountName}, from_emails:`, account.from_emails);
+        if (!account.from_emails) return;
+        
         account.from_emails.forEach(fromEmail => {
-            console.log(`  📮 Email: ${fromEmail.email}, status: ${fromEmail.status}`);
             if (fromEmail.status === 'active') {
                 hasActive = true;
-                const row = `
-                    <tr>
-                        <td><input type="checkbox" class="active-from-checkbox" value="${fromEmail.email}"></td>
-                        <td><strong>${fromEmail.email}</strong></td>
-                        <td>${accountName}</td>
-                        <td>${new Date(fromEmail.last_seen).toLocaleString()}</td>
-                        <td>
-                            <button class="btn btn-sm btn-warning" onclick="toggleFromStatus('${fromEmail.email}', 'inactive')">
-                                <i class="bi bi-x-circle"></i> Deactivate
-                            </button>
-                        </td>
-                    </tr>
-                `;
-                tbody.innerHTML += row;
                 count++;
+                
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><input type="checkbox" class="active-from-checkbox" value="${fromEmail.email}"></td>
+                    <td><strong>${fromEmail.email}</strong></td>
+                    <td>${accountName}</td>
+                    <td>${new Date(fromEmail.last_seen).toLocaleString()}</td>
+                    <td>
+                        <button class="btn btn-sm btn-warning" onclick="toggleFromStatus('${fromEmail.email}', 'inactive')">
+                            <i class="bi bi-x-circle"></i> Deactivate
+                        </button>
+                    </td>
+                `;
+                fragment.appendChild(tr);
             }
         });
     });
     
+    // Clear and update in one operation
+    tbody.innerHTML = '';
+    
     if (!hasActive) {
-        console.log('⚠️ No active froms found');
         tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted"><i class="bi bi-inbox"></i> No active from emails</td></tr>';
+    } else {
+        tbody.appendChild(fragment);
     }
     
     console.log(`📋 Rendered ${count} active froms`);
@@ -1349,35 +1351,44 @@ function updateActiveFromsList() {
 function updateInactiveFromsList() {
     const start = performance.now();
     const tbody = document.getElementById('inactiveFromsList');
-    tbody.innerHTML = '';
     
+    // Use DocumentFragment for batch DOM updates
+    const fragment = document.createDocumentFragment();
     let hasInactive = false;
     let count = 0;
+    
     Object.entries(monitoredFroms).forEach(([accountName, account]) => {
+        if (!account.from_emails) return;
+        
         account.from_emails.forEach(fromEmail => {
             if (fromEmail.status === 'inactive') {
                 hasInactive = true;
                 count++;
-                const row = `
-                    <tr>
-                        <td><input type="checkbox" class="inactive-from-checkbox" value="${fromEmail.email}"></td>
-                        <td><strong>${fromEmail.email}</strong></td>
-                        <td>${accountName}</td>
-                        <td>${new Date(fromEmail.last_seen).toLocaleString()}</td>
-                        <td>
-                            <button class="btn btn-sm btn-success" onclick="toggleFromStatus('${fromEmail.email}', 'active')">
-                                <i class="bi bi-check-circle"></i> Activate
-                            </button>
-                        </td>
-                    </tr>
+                
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><input type="checkbox" class="inactive-from-checkbox" value="${fromEmail.email}"></td>
+                    <td><strong>${fromEmail.email}</strong></td>
+                    <td>${accountName}</td>
+                    <td>${new Date(fromEmail.last_seen).toLocaleString()}</td>
+                    <td>
+                        <button class="btn btn-sm btn-success" onclick="toggleFromStatus('${fromEmail.email}', 'active')">
+                            <i class="bi bi-check-circle"></i> Activate
+                        </button>
+                    </td>
                 `;
-                tbody.innerHTML += row;
+                fragment.appendChild(tr);
             }
         });
     });
     
+    // Clear and update in one operation
+    tbody.innerHTML = '';
+    
     if (!hasInactive) {
         tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted"><i class="bi bi-inbox"></i> No inactive from emails</td></tr>';
+    } else {
+        tbody.appendChild(fragment);
     }
     
     console.log(`📋 Rendered ${count} inactive froms`);
