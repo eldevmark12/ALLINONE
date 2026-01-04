@@ -698,14 +698,15 @@ copermerv2026@yahoo.com</textarea>
             </div>
             <div class="modal-footer">
                 <div class="me-auto">
+                    <button class="btn btn-primary btn-lg" onclick="replaceActiveFroms()">
+                        <i class="bi bi-arrow-repeat"></i> Replace Active Froms
+                        <small class="d-block" style="font-size: 0.75rem;">Move old active → inactive, new working → active</small>
+                    </button>
                     <button class="btn btn-success" onclick="moveWorkingToActive()">
                         <i class="bi bi-arrow-right-circle-fill"></i> Move Working to Active
                     </button>
                     <button class="btn btn-secondary" onclick="moveFailedToInactive()">
                         <i class="bi bi-arrow-left-circle-fill"></i> Move Failed to Inactive
-                    </button>
-                    <button class="btn btn-primary" onclick="swapActiveInactive()">
-                        <i class="bi bi-arrow-left-right"></i> Swap Active ↔ Inactive
                     </button>
                 </div>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -1713,23 +1714,33 @@ function addRecheckActivity(message, type = 'info') {
 
 // View full results
 function viewRecheckResults() {
-    // Hide progress modal
-    if (recheckProgressModal) {
-        recheckProgressModal.hide();
-    }
-    
-    // Load results
+    // Load results first
     fetch('/api/recheck/results')
         .then(res => res.json())
         .then(data => {
             if (data.success) {
                 recheckResults = data.results;
+                
+                // Render results in tables
                 renderRecheckResults();
                 
+                // Hide progress modal if open
+                if (recheckProgressModal) {
+                    recheckProgressModal.hide();
+                }
+                
                 // Show results modal
-                recheckResultsModal = new bootstrap.Modal(document.getElementById('recheckResultsModal'));
+                if (!recheckResultsModal) {
+                    recheckResultsModal = new bootstrap.Modal(document.getElementById('recheckResultsModal'));
+                }
                 recheckResultsModal.show();
+            } else {
+                alert('Failed to load results: ' + (data.message || 'Unknown error'));
             }
+        })
+        .catch(err => {
+            console.error('Error loading results:', err);
+            alert('Network error while loading results');
         });
 }
 
@@ -1770,6 +1781,11 @@ function swapRecheckResults() {
                 `• ${data.moved_to_active} working emails → Active`, 
                 'success');
             loadMonitoredFroms(); // Refresh the from lists
+            
+            // Close results modal if open
+            if (recheckResultsModal) {
+                recheckResultsModal.hide();
+            }
         } else {
             showAlert('recheckAlertContainer', data.message || 'Error swapping results', 'danger');
         }
@@ -1778,6 +1794,30 @@ function swapRecheckResults() {
         console.error('Swap error:', err);
         showAlert('recheckAlertContainer', 'Network error while swapping results', 'danger');
     });
+}
+
+// Replace Active Froms - single button action
+function replaceActiveFroms() {
+    const working = recheckResults.working || [];
+    
+    if (working.length === 0) {
+        alert('No working from addresses found to replace with');
+        return;
+    }
+    
+    const msg = `🔄 Replace Active Froms\n\n` +
+               `This will:\n` +
+               `• Move ALL old active emails → Inactive\n` +
+               `• Move ${working.length} new working emails → Active\n\n` +
+               `Your active froms will be replaced with freshly verified ones.\n\n` +
+               `Continue?`;
+    
+    if (!confirm(msg)) {
+        return;
+    }
+    
+    // Call the swap API
+    swapRecheckResults();
 }
 
 // Render results tables

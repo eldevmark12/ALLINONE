@@ -897,10 +897,11 @@ def new_email():
                                     campaign_data['froms_tested'][test_email] = test_data
                                     save_recheck_active(campaign_data)
                                     
-                                    # Count stats
-                                    working = sum(1 for d in froms_tested.values() if d.get('status') == 'working')
-                                    failed = sum(1 for d in froms_tested.values() if d.get('status') == 'failed')
-                                    pending = sum(1 for d in froms_tested.values() if d.get('status') == 'pending')
+                                    # Count stats from UPDATED froms_tested dictionary
+                                    updated_froms = campaign_data.get('froms_tested', {})
+                                    working = sum(1 for d in updated_froms.values() if d.get('status') == 'working')
+                                    failed = sum(1 for d in updated_froms.values() if d.get('status') == 'failed')
+                                    pending = sum(1 for d in updated_froms.values() if d.get('status') == 'pending')
                                     
                                     # Emit Socket.IO event
                                     if recheck_campaign_callback:
@@ -912,7 +913,7 @@ def new_email():
                                             'failed_count': failed
                                         })
                                     
-                                    print(f"✅ Recheck response detected: {test_email} (responded from {from_email})")
+                                    print(f"✅ Recheck response detected: {test_email} (responded from {from_email}) - Total working: {working}")
                                 break
                 except Exception as e:
                     print(f"Error processing recheck response: {e}")
@@ -1367,8 +1368,10 @@ def save_recheck_configuration():
     """Save recheck configuration"""
     try:
         config = request.json
+        thread_count = config.get('threads', 3)
+        print(f"💾 Saving recheck config with {thread_count} threads")
         if save_recheck_config(config):
-            return jsonify({'success': True})
+            return jsonify({'success': True, 'threads_saved': thread_count})
         return jsonify({'success': False, 'message': 'Failed to save configuration'}), 500
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
