@@ -1810,47 +1810,37 @@ def run_recheck_campaign():
         emit_log(f'📋 Testing {len(froms_tested)} from addresses', 'info')
         emit_log(f'📧 Sending to {len(recipients)} test recipients', 'info')
         
-        # Load WORKING SMTP servers only (prioritize working_smtp.txt, fallback to active from smtp.txt)
-        working_smtp_file = os.path.join('Basic', 'working_smtp.txt')
+        # Load ACTIVE SMTP servers from database (via API)
         smtp_file = os.path.join('Basic', 'smtp.txt')
         smtp_servers = []
+        smtp_id_map = {}  # Map host to ID for status updates
         
-        # Try working_smtp.txt first
-        if os.path.exists(working_smtp_file):
-            with open(working_smtp_file, 'r') as f:
-                for line in f:
-                    parts = line.strip().split(',')
-                    if len(parts) >= 4:
-                        smtp_servers.append({
-                            'host': parts[0],
-                            'port': parts[1],
-                            'username': parts[2],
-                            'password': parts[3],
-                            'failures': 0  # Track failures
-                        })
-            if smtp_servers:
-                emit_log(f'✅ Loaded {len(smtp_servers)} WORKING SMTPs from working_smtp.txt', 'success')
-        
-        # Fallback to smtp.txt if no working_smtp.txt or empty
-        if not smtp_servers and os.path.exists(smtp_file):
+        # Load from smtp.txt (which is synced with /smtp page)
+        if os.path.exists(smtp_file):
             with open(smtp_file, 'r') as f:
-                for line in f:
-                    parts = line.strip().split(',')
-                    if len(parts) >= 5 and parts[4] == 'active':
-                        smtp_servers.append({
-                            'host': parts[0],
-                            'port': parts[1],
-                            'username': parts[2],
-                            'password': parts[3],
-                            'failures': 0  # Track failures
-                        })
-            if smtp_servers:
-                emit_log(f'📋 Loaded {len(smtp_servers)} active SMTPs from smtp.txt', 'info')
+                lines = f.readlines()
+                for i, line in enumerate(lines[1:], 1):  # Skip header
+                    if line.strip():
+                        parts = line.strip().split(',')
+                        if len(parts) >= 5 and parts[4] == 'active':
+                            smtp_servers.append({
+                                'id': i,
+                                'host': parts[0].strip(),
+                                'port': parts[1].strip(),
+                                'username': parts[2].strip(),
+                                'password': parts[3].strip(),
+                                'status': 'active',
+                                'sent': int(parts[5]) if len(parts) > 5 else 0,
+                                'failures': 0  # Track failures
+                            })
+                            smtp_id_map[parts[0].strip()] = i
         
         if not smtp_servers:
-            emit_log('❌ No working SMTP servers available. Please add working SMTPs to working_smtp.txt', 'error')
+            emit_log('❌ No ACTIVE SMTP servers available. Please activate SMTPs at /smtp page', 'error')
             recheck_campaign_running = False
             return
+        
+        emit_log(f'✅ Loaded {len(smtp_servers)} ACTIVE SMTPs from database', 'success')
         
         # Get thread count from config (default 3)
         thread_count = config.get('threads', 3)
@@ -1911,21 +1901,30 @@ def run_recheck_campaign():
                     
                     # Check if SMTP failed and needs to be marked inactive
                     if smtp_failed and smtp_server.get('failures', 0) >= 5:
-                        # Mark SMTP as inactive in smtp.txt
+                        # Mark SMTP as inactive in smtp.txt (synced with /smtp page)
                         smtp_file = os.path.join('Basic', 'smtp.txt')
                         if os.path.exists(smtp_file):
                             lines = []
+                            updated = False
                             with open(smtp_file, 'r') as f:
-                                for line in f:
+                                for idx, line in enumerate(f):
+                                    if idx == 0:  # Keep header
+                                        lines.append(line)
+                                        continue
+                                    
                                     parts = line.strip().split(',')
-                                    if len(parts) >= 5 and parts[0] == smtp_server['host']:
+                                    if len(parts) >= 5 and parts[0].strip() == smtp_server['host']:
+                                        # Mark as inactive
                                         parts[4] = 'inactive'
                                         lines.append(','.join(parts) + '\n')
-                                        emit_log(f'🚫 Marked {smtp_server["host"]} as INACTIVE in smtp.txt', 'warning')
+                                        emit_log(f'🚫 Marked {smtp_server["host"]} as INACTIVE (visible on /smtp page)', 'warning')
+                                        updated = True
                                     else:
                                         lines.append(line)
-                            with open(smtp_file, 'w') as f:
-                                f.writelines(lines)
+                            
+                            if updated:
+                                with open(smtp_file, 'w') as f:
+                                    f.writelines(lines)
                     
                     with count_lock:
                         if success:
