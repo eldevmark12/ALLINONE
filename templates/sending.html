@@ -644,9 +644,14 @@ copermerv2026@yahoo.com</textarea>
                         </div>
                     </div>
                     <div class="col-md-4">
-                        <h6><i class="bi bi-check-circle-fill text-success"></i> Working Froms</h6>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0"><i class="bi bi-check-circle-fill text-success"></i> Working Froms</h6>
+                            <button class="btn btn-sm btn-success" onclick="copyWorkingEmails()" title="Copy all working emails">
+                                <i class="bi bi-clipboard"></i> Copy All
+                            </button>
+                        </div>
                         <textarea id="recheckWorkingLog" readonly
-                                  style="height: 200px; width: 100%; background: #d1f2dd; padding: 10px; border: 1px solid #28a745; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 11px; resize: none;"
+                                  style="height: 180px; width: 100%; background: #d1f2dd; padding: 10px; border: 1px solid #28a745; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 11px; resize: none;"
                                   placeholder="Working from emails will appear here..."></textarea>
                     </div>
                 </div>
@@ -679,6 +684,35 @@ copermerv2026@yahoo.com</textarea>
                         <div class="alert alert-info">
                             <strong>Campaign Summary:</strong> 
                             <span id="resultsSummaryText"></span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Real-time Captured Working Emails -->
+                <div class="row mb-3" id="realTimeWorkingSection" style="display: none;">
+                    <div class="col-md-12">
+                        <div class="card border-success">
+                            <div class="card-header bg-success text-white">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0">
+                                        <i class="bi bi-lightning-fill"></i> Real-Time Captured Working Emails
+                                        <span class="badge bg-light text-success ms-2" id="realTimeWorkingCount">0</span>
+                                    </h6>
+                                    <button class="btn btn-sm btn-light" onclick="copyRealTimeWorking()">
+                                        <i class="bi bi-clipboard"></i> Copy All
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body p-2">
+                                <textarea id="realTimeWorkingEmails" readonly
+                                          class="form-control font-monospace"
+                                          style="height: 150px; background: #d1f2dd; border: 1px solid #28a745; font-size: 11px; resize: vertical;"
+                                          placeholder="Working emails detected in real-time will appear here..."></textarea>
+                                <small class="text-muted">
+                                    <i class="bi bi-info-circle"></i> These are all emails detected during the campaign, even if stopped early. 
+                                    Use this list to replace your active froms.
+                                </small>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2050,6 +2084,68 @@ function startRecheckCampaign() {
     });
 }
 
+// Copy all working emails from the working log
+function copyWorkingEmails() {
+    const workingLog = document.getElementById('recheckWorkingLog');
+    const emails = workingLog.value.trim();
+    
+    if (!emails) {
+        alert('No working emails to copy yet');
+        return;
+    }
+    
+    // Copy to clipboard
+    navigator.clipboard.writeText(emails).then(() => {
+        // Show success feedback
+        const btn = event.target.closest('button');
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-check-lg"></i> Copied!';
+        btn.classList.remove('btn-success');
+        btn.classList.add('btn-info');
+        
+        setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.classList.remove('btn-info');
+            btn.classList.add('btn-success');
+        }, 2000);
+        
+        console.log(`📋 Copied ${emails.split('\n').filter(e => e.trim()).length} working emails to clipboard`);
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+        alert('Failed to copy to clipboard. Please select and copy manually.');
+    });
+}
+
+// Copy real-time working emails from results modal
+function copyRealTimeWorking() {
+    const emails = document.getElementById('realTimeWorkingEmails').value.trim();
+    
+    if (!emails) {
+        alert('No working emails to copy');
+        return;
+    }
+    
+    navigator.clipboard.writeText(emails).then(() => {
+        const btn = event.target.closest('button');
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-check-lg"></i> Copied!';
+        btn.classList.remove('btn-light');
+        btn.classList.add('btn-success');
+        
+        setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-light');
+        }, 2000);
+        
+        const count = emails.split('\n').filter(e => e.trim()).length;
+        console.log(`📋 Copied ${count} real-time working emails to clipboard`);
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+        alert('Failed to copy to clipboard');
+    });
+}
+
 // Stop recheck campaign
 function stopRecheckCampaign() {
     if (!confirm('Stop the recheck campaign?')) return;
@@ -2134,6 +2230,10 @@ function addRecheckActivity(message, type = 'info') {
 
 // View full results
 function viewRecheckResults() {
+    // Get real-time working emails from the working log
+    const workingLog = document.getElementById('recheckWorkingLog');
+    const realTimeEmails = workingLog ? workingLog.value.trim() : '';
+    
     // Load results first
     fetch('/api/recheck/results')
         .then(res => res.json())
@@ -2143,6 +2243,16 @@ function viewRecheckResults() {
                 
                 // Render results in tables
                 renderRecheckResults();
+                
+                // Show real-time working emails if available
+                if (realTimeEmails) {
+                    const emailList = realTimeEmails.split('\n').filter(e => e.trim());
+                    document.getElementById('realTimeWorkingSection').style.display = 'block';
+                    document.getElementById('realTimeWorkingEmails').value = realTimeEmails;
+                    document.getElementById('realTimeWorkingCount').textContent = emailList.length;
+                } else {
+                    document.getElementById('realTimeWorkingSection').style.display = 'none';
+                }
                 
                 // Hide progress modal if open
                 if (recheckProgressModal) {
