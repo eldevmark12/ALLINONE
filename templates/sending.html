@@ -698,7 +698,7 @@ copermerv2026@yahoo.com</textarea>
                                         <i class="bi bi-lightning-fill"></i> Real-Time Captured Working Emails
                                         <span class="badge bg-light text-success ms-2" id="realTimeWorkingCount">0</span>
                                     </h6>
-                                    <button class="btn btn-sm btn-light" onclick="copyRealTimeWorking()">
+                                    <button class="btn btn-sm btn-light" onclick="copyRealTimeWorking(event)">
                                         <i class="bi bi-clipboard"></i> Copy All
                                     </button>
                                 </div>
@@ -2309,7 +2309,7 @@ function copyWorkingEmails() {
 }
 
 // Copy real-time working emails from results modal
-function copyRealTimeWorking() {
+function copyRealTimeWorking(event) {
     const emails = document.getElementById('realTimeWorkingEmails').value.trim();
     
     if (!emails) {
@@ -2318,7 +2318,9 @@ function copyRealTimeWorking() {
     }
     
     navigator.clipboard.writeText(emails).then(() => {
-        const btn = event.target.closest('button');
+        const btn = event?.target?.closest('button');
+        if (!btn) return;
+        
         const originalHTML = btn.innerHTML;
         btn.innerHTML = '<i class="bi bi-check-lg"></i> Copied!';
         btn.classList.remove('btn-light');
@@ -2444,18 +2446,32 @@ function viewRecheckResults() {
             if (data.success) {
                 recheckResults = data.results;
                 
-                // Render results in tables
-                renderRecheckResults();
-                
-                // Show real-time working emails if available
+                // Parse real-time working emails and merge with results
                 if (realTimeEmails) {
                     const emailList = realTimeEmails.split('\n').filter(e => e.trim());
                     document.getElementById('realTimeWorkingSection').style.display = 'block';
                     document.getElementById('realTimeWorkingEmails').value = realTimeEmails;
                     document.getElementById('realTimeWorkingCount').textContent = emailList.length;
+                    
+                    // Add real-time emails to working results if not already there
+                    recheckResults.working = recheckResults.working || [];
+                    emailList.forEach(email => {
+                        // Check if email already in working results
+                        if (!recheckResults.working.find(w => w.email === email)) {
+                            recheckResults.working.push({
+                                email: email,
+                                sent_at: new Date().toISOString(),
+                                delivered_at: new Date().toISOString(),
+                                unique_id: 'realtime'
+                            });
+                        }
+                    });
                 } else {
                     document.getElementById('realTimeWorkingSection').style.display = 'none';
                 }
+                
+                // Render results in tables
+                renderRecheckResults();
                 
                 // Hide progress modal if open
                 if (recheckProgressModal) {

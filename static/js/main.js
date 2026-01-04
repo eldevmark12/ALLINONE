@@ -82,6 +82,8 @@ try {
             reconnectionDelayMax: 10000,
             reconnectionAttempts: Infinity,
             timeout: 60000,  // Increased from 20s to 60s for render.com
+            pingTimeout: 60000,  // Time to wait for pong response (60s for render.com)
+            pingInterval: 25000,  // How often to send ping (25s)
             autoConnect: true,
             forceNew: false,
             multiplex: true,
