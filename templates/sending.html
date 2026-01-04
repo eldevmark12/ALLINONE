@@ -887,15 +887,40 @@ document.addEventListener('DOMContentLoaded', function() {
     // Setup tab change listeners for lazy loading
     setupTabLazyLoading();
     
-    // Load monitored froms data for counts ONLY (don't render lists yet)
-    console.log('📊 Loading initial counts (not rendering lists)...');
+    // Load monitored froms data for counts AND render initial visible tab
+    console.log('📊 Loading initial counts and active tab...');
     loadMonitoredFroms(false).then(() => {
-        console.log('✅ Page initialized with counts loaded');
+        console.log('✅ Counts loaded');
+        
+        // Check which tab is currently active and load it
+        const activeTab = document.querySelector('.tab-pane.active');
+        if (activeTab) {
+            const tabId = activeTab.id;
+            console.log(`📍 Current active tab: ${tabId}`);
+            
+            if (tabId === 'active-froms') {
+                console.log('📥 Loading active froms (initial visible tab)...');
+                loadActiveFromsTab();
+                tabsLoaded['active'] = true;
+            } else if (tabId === 'inactive-froms') {
+                console.log('📥 Loading inactive froms (initial visible tab)...');
+                loadInactiveFromsTab();
+                tabsLoaded['inactive'] = true;
+            } else if (tabId === 'recheck-froms') {
+                console.log('📥 Loading recheck (initial visible tab)...');
+                loadRecheckTab();
+                tabsLoaded['recheck'] = true;
+            } else if (tabId === 'sending-recipients') {
+                console.log('📥 Loading recipients (initial visible tab)...');
+                loadRecipientsTab();
+                tabsLoaded['recipients'] = true;
+            } else if (tabId === 'sending-settings') {
+                tabsLoaded['settings'] = true;
+            }
+        }
+        
         logPerformance('Page initialization', initStart);
     });
-    
-    // Mark Settings tab as loaded (default visible tab)
-    tabsLoaded['settings'] = true;
     
     // NO automatic intervals - only reload when user interacts
 });

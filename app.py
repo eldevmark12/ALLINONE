@@ -1014,20 +1014,31 @@ def get_monitored_froms():
     """Get monitored from emails for display in UI"""
     try:
         with monitored_lock:
+            # Remove duplicates first
+            remove_duplicates_from_status()
+            
+            # Use a set to track unique emails and avoid duplicates across accounts
+            seen_emails = {}  # email -> {status, last_seen, account}
+            
             # Transform data for new UI with active/inactive status
             formatted_data = {}
             for account_name, account_data in monitored_data['accounts'].items():
-                formatted_data[account_name] = {
-                    'from_emails': [
-                        {
+                formatted_emails = []
+                for from_email in account_data['from_emails']:
+                    # Track first occurrence of each email
+                    if from_email not in seen_emails:
+                        seen_emails[from_email] = {
                             'email': from_email,
                             'status': get_from_status(from_email),
-                            'last_seen': account_data['last_email']
+                            'last_seen': account_data['last_email'],
+                            'account': account_name
                         }
-                        for from_email in account_data['from_emails']
-                    ],
+                        formatted_emails.append(seen_emails[from_email])
+                
+                formatted_data[account_name] = {
+                    'from_emails': formatted_emails,
                     'email_count': account_data['email_count'],
-                    'from_count': account_data['from_count'],
+                    'from_count': len(formatted_emails),  # Use deduplicated count
                     'last_email': account_data['last_email']
                 }
             
