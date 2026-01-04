@@ -749,7 +749,7 @@ function logPerformance(operation, startTime) {
     return duration;
 }
 
-// Initialize - MINIMAL loading on page load
+// Initialize - Load counts immediately, full data on tab clicks
 document.addEventListener('DOMContentLoaded', function() {
     const initStart = performance.now();
     console.log('🚀 Initializing Sending page...');
@@ -757,17 +757,23 @@ document.addEventListener('DOMContentLoaded', function() {
     bulkRecipientsModal = new bootstrap.Modal(document.getElementById('bulkRecipientsModal'));
     campaignStartModal = new bootstrap.Modal(document.getElementById('campaignStartModal'));
     
-    // DON'T load data on page load - wait for user interaction
-    console.log('✅ Page initialized (no data loaded yet)');
-    logPerformance('Page initialization', initStart);
-    
     // Load recheck config silently (lightweight)
     loadRecheckConfig();
     
     // Setup tab change listeners for lazy loading
     setupTabLazyLoading();
     
-    // NO automatic intervals - only load when user views a tab
+    // Load monitored froms data for counts ONLY (don't render lists yet)
+    console.log('📊 Loading initial counts (not rendering lists)...');
+    loadMonitoredFroms(false).then(() => {
+        console.log('✅ Page initialized with counts loaded');
+        logPerformance('Page initialization', initStart);
+    });
+    
+    // Mark Settings tab as loaded (default visible tab)
+    tabsLoaded['settings'] = true;
+    
+    // NO automatic intervals - only reload when user interacts
 });
 
 // Setup lazy loading on tab clicks
@@ -822,27 +828,39 @@ function setupTabLazyLoading() {
 // Load active froms tab data only
 function loadActiveFromsTab() {
     const start = performance.now();
-    console.log('📥 Loading active froms...');
+    console.log('📥 Loading active froms tab...');
     
-    // Show loading on count only
-    document.getElementById('activeFromsCount').innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-    
-    loadMonitoredFroms().then(() => {
-        logPerformance('Load active froms', start);
-    });
+    // If data already loaded, just render the list
+    if (Object.keys(monitoredFroms).length > 0) {
+        console.log('📊 Data exists, rendering active list...');
+        updateActiveFromsList();
+        logPerformance('Render active froms list', start);
+    } else {
+        // First time - need to fetch data
+        console.log('🔄 Fetching data for active froms...');
+        loadMonitoredFroms(true).then(() => {
+            logPerformance('Load active froms', start);
+        });
+    }
 }
 
 // Load inactive froms tab data only
 function loadInactiveFromsTab() {
     const start = performance.now();
-    console.log('📥 Loading inactive froms...');
+    console.log('📥 Loading inactive froms tab...');
     
-    // Show loading on count only
-    document.getElementById('inactiveFromsCount').innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-    
-    loadMonitoredFroms().then(() => {
-        logPerformance('Load inactive froms', start);
-    });
+    // If data already loaded, just render the list
+    if (Object.keys(monitoredFroms).length > 0) {
+        console.log('📊 Data exists, rendering inactive list...');
+        updateInactiveFromsList();
+        logPerformance('Render inactive froms list', start);
+    } else {
+        // First time - need to fetch data
+        console.log('🔄 Fetching data for inactive froms...');
+        loadMonitoredFroms(true).then(() => {
+            logPerformance('Load inactive froms', start);
+        });
+    }
 }
 
 // Load recipients tab data only
@@ -937,7 +955,7 @@ function showLoadingSpinner(elementId) {
 let lastFromsLoad = 0;
 const FROMS_CACHE_TIME = 5000; // 5 seconds cache
 
-function loadMonitoredFroms() {
+function loadMonitoredFroms(renderLists = true) {
     const start = performance.now();
     
     // Throttle: Don't reload if loaded recently
@@ -965,8 +983,15 @@ function loadMonitoredFroms() {
             const parseStart = performance.now();
             monitoredFroms = data;
             updateMonitoredCounts();
-            updateActiveFromsList();
-            updateInactiveFromsList();
+            
+            // Only render lists if requested (for initial load, skip rendering)
+            if (renderLists) {
+                updateActiveFromsList();
+                updateInactiveFromsList();
+            } else {
+                console.log('📊 Counts updated (lists not rendered)');
+            }
+            
             logPerformance('Parse and render from emails', parseStart);
             logPerformance('Total loadMonitoredFroms', start);
         })
