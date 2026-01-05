@@ -256,12 +256,26 @@ function loadServers() {
 
 function renderTable() {
     const tbody = document.getElementById('smtpTableBody');
-    let filteredServers = servers;
+    let filteredServers = [];
+    let filteredIndices = [];
     
     if (currentFilter === 'active') {
-        filteredServers = servers.filter(s => s.status === 'active');
+        servers.forEach((s, idx) => {
+            if (s.status === 'active') {
+                filteredServers.push(s);
+                filteredIndices.push(idx);
+            }
+        });
     } else if (currentFilter === 'inactive') {
-        filteredServers = servers.filter(s => s.status === 'inactive' || !s.status);
+        servers.forEach((s, idx) => {
+            if (s.status === 'inactive' || !s.status) {
+                filteredServers.push(s);
+                filteredIndices.push(idx);
+            }
+        });
+    } else {
+        filteredServers = servers;
+        filteredIndices = servers.map((s, idx) => idx);
     }
     
     if (filteredServers.length === 0) {
@@ -270,7 +284,7 @@ function renderTable() {
     }
     
     tbody.innerHTML = filteredServers.map((server, index) => {
-        const actualIndex = servers.findIndex(s => s.id === server.id || (s.username === server.username && s.host === server.host));
+        const actualIndex = filteredIndices[index];
         const statusBadge = server.status === 'active' 
             ? '<span class="badge bg-success">Active</span>' 
             : '<span class="badge bg-secondary">Inactive</span>';
