@@ -168,7 +168,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="log-container" id="validationLogs" style="max-height: 300px;">
+                <div class="log-container" id="validationLogs" style="max-height: 400px; overflow-y: auto; background-color: #f8f9fa; padding: 15px; border-radius: 5px; font-family: monospace; font-size: 13px;">
                     <div class="text-muted">Validation will start shortly...</div>
                 </div>
             </div>
@@ -487,12 +487,14 @@ function validateServers(indices) {
     
     const selectedServers = indices.map(i => servers[i]);
     
+    console.log(`🔍 Starting validation of ${selectedServers.length} SMTP servers:`, selectedServers.map(s => s.username || s.email));
+    
     // Show validation modal
     const modal = new bootstrap.Modal(document.getElementById('validationModal'));
     modal.show();
     
     // Reset validation UI
-    document.getElementById('validationLogs').innerHTML = '<div class="text-muted">Starting validation...</div>';
+    document.getElementById('validationLogs').innerHTML = `<div class="text-success"><strong>📋 Starting validation of ${selectedServers.length} SMTP servers...</strong></div>`;
     document.getElementById('validationProgress').textContent = `0/${selectedServers.length}`;
     document.getElementById('validationProgressBar').style.width = '0%';
     document.getElementById('validatedCount').textContent = '0';
@@ -512,7 +514,8 @@ function validateServers(indices) {
     .then(res => res.json())
     .then(data => {
         if (data.success) {
-            addValidationLog('✓ Validation started successfully');
+            addValidationLog(`✓ Validation started successfully for ${selectedServers.length} servers`);
+            addValidationLog(`⏳ Testing SMTP connections and sending test emails...`);
         } else {
             showAlert('Error: ' + data.error, 'danger');
             isValidating = false; // Reset on error
