@@ -313,6 +313,110 @@
     </div>
 </div>
 
+<!-- File Upload Modal for From Emails -->
+<div class="modal fade" id="fromFileUploadModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-cloud-upload-fill"></i> Upload from.txt File
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" id="fileUploadCloseBtn"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle-fill"></i>
+                    <strong>Large File Support:</strong> This uploader can handle files up to 200+ MB with millions of emails.
+                    <ul class="mb-0 mt-2">
+                        <li>Files are processed in chunks for better performance</li>
+                        <li>Duplicates are automatically removed</li>
+                        <li>Progress is shown in real-time</li>
+                    </ul>
+                </div>
+                
+                <!-- File Input -->
+                <div class="mb-4" id="fileSelectSection">
+                    <label for="fromFileInput" class="form-label"><strong>Select from.txt file:</strong></label>
+                    <input type="file" class="form-control form-control-lg" id="fromFileInput" accept=".txt" onchange="handleFromFileSelect(event)">
+                    <small class="text-muted">Supported format: Plain text file with one email per line</small>
+                </div>
+                
+                <!-- File Info -->
+                <div class="card mb-3 d-none" id="fileInfoCard">
+                    <div class="card-body">
+                        <h6 class="card-title"><i class="bi bi-file-earmark-text"></i> File Information</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <small class="text-muted">Filename:</small>
+                                <div><strong id="fileName">-</strong></div>
+                            </div>
+                            <div class="col-md-3">
+                                <small class="text-muted">Size:</small>
+                                <div><strong id="fileSize">-</strong></div>
+                            </div>
+                            <div class="col-md-3">
+                                <small class="text-muted">Emails Found:</small>
+                                <div><strong id="emailsFound" class="text-primary">-</strong></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Progress Section -->
+                <div class="d-none" id="uploadProgressSection">
+                    <div class="card border-primary">
+                        <div class="card-body">
+                            <h6 class="card-title">
+                                <span class="spinner-border spinner-border-sm me-2" id="uploadSpinner"></span>
+                                <span id="uploadStatusText">Processing...</span>
+                            </h6>
+                            
+                            <!-- Progress Bar -->
+                            <div class="progress mb-3" style="height: 25px;">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                     id="uploadProgressBar" 
+                                     role="progressbar" 
+                                     style="width: 0%">
+                                    <span id="uploadProgressText">0%</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Stats -->
+                            <div class="row text-center">
+                                <div class="col-4">
+                                    <small class="text-muted">Processed</small>
+                                    <div><strong id="emailsProcessed" class="text-info">0</strong></div>
+                                </div>
+                                <div class="col-4">
+                                    <small class="text-muted">Valid</small>
+                                    <div><strong id="emailsValid" class="text-success">0</strong></div>
+                                </div>
+                                <div class="col-4">
+                                    <small class="text-muted">Duplicates</small>
+                                    <div><strong id="emailsDuplicates" class="text-warning">0</strong></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Success Message -->
+                <div class="alert alert-success d-none" id="uploadSuccessAlert">
+                    <i class="bi bi-check-circle-fill"></i>
+                    <strong>Upload Complete!</strong>
+                    <div id="uploadSummary"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="fileUploadCancelBtn">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="startFileUpload()" id="fileUploadStartBtn" disabled>
+                    <i class="bi bi-upload"></i> Start Upload
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -585,7 +689,189 @@ function clearRecipientsList() {
 
 // File upload placeholders (can be implemented later)
 function showFromFileUpload() {
-    alert('Feature coming soon: Direct file upload for from.txt');
+    console.log('📁 Opening file upload modal...');
+    const modal = new bootstrap.Modal(document.getElementById('fromFileUploadModal'));
+    
+    // Reset modal state
+    document.getElementById('fromFileInput').value = '';
+    document.getElementById('fileInfoCard').classList.add('d-none');
+    document.getElementById('uploadProgressSection').classList.add('d-none');
+    document.getElementById('uploadSuccessAlert').classList.add('d-none');
+    document.getElementById('fileSelectSection').classList.remove('d-none');
+    document.getElementById('fileUploadStartBtn').disabled = true;
+    document.getElementById('fileUploadCloseBtn').disabled = false;
+    document.getElementById('fileUploadCancelBtn').disabled = false;
+    
+    modal.show();
+}
+
+let selectedFile = null;
+let parsedEmails = [];
+
+function handleFromFileSelect(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    console.log(`📄 File selected: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
+    selectedFile = file;
+    
+    // Show file info
+    document.getElementById('fileName').textContent = file.name;
+    document.getElementById('fileSize').textContent = (file.size / 1024 / 1024).toFixed(2) + ' MB';
+    document.getElementById('emailsFound').textContent = 'Reading...';
+    document.getElementById('fileInfoCard').classList.remove('d-none');
+    
+    // Parse file to count emails (chunked reading for large files)
+    parseFileForEmails(file);
+}
+
+function parseFileForEmails(file) {
+    console.log('📖 Parsing file for email count...');
+    const chunkSize = 1024 * 1024; // 1MB chunks
+    let offset = 0;
+    const emailSet = new Set();
+    let buffer = '';
+    
+    const readChunk = () => {
+        const slice = file.slice(offset, offset + chunkSize);
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            const text = buffer + e.target.result;
+            const lines = text.split('\n');
+            
+            // Keep last incomplete line in buffer
+            buffer = lines.pop();
+            
+            // Process complete lines
+            lines.forEach(line => {
+                const email = line.trim();
+                if (email && email.includes('@')) {
+                    emailSet.add(email.toLowerCase());
+                }
+            });
+            
+            offset += chunkSize;
+            
+            // Continue reading or finish
+            if (offset < file.size) {
+                readChunk();
+            } else {
+                // Process last buffer
+                if (buffer.trim() && buffer.includes('@')) {
+                    emailSet.add(buffer.trim().toLowerCase());
+                }
+                
+                parsedEmails = Array.from(emailSet);
+                console.log(`✅ Found ${parsedEmails.length} unique emails in file`);
+                document.getElementById('emailsFound').textContent = parsedEmails.length.toLocaleString();
+                document.getElementById('fileUploadStartBtn').disabled = false;
+            }
+        };
+        
+        reader.onerror = function() {
+            console.error('❌ Error reading file');
+            alert('Error reading file. Please try again.');
+        };
+        
+        reader.readAsText(slice);
+    };
+    
+    readChunk();
+}
+
+async function startFileUpload() {
+    if (!selectedFile || parsedEmails.length === 0) {
+        alert('Please select a valid file first');
+        return;
+    }
+    
+    console.log(`🚀 Starting upload of ${parsedEmails.length} emails...`);
+    
+    // Update UI
+    document.getElementById('fileSelectSection').classList.add('d-none');
+    document.getElementById('uploadProgressSection').classList.remove('d-none');
+    document.getElementById('fileUploadStartBtn').disabled = true;
+    document.getElementById('fileUploadCloseBtn').disabled = true;
+    document.getElementById('fileUploadCancelBtn').disabled = true;
+    document.getElementById('uploadStatusText').textContent = 'Uploading emails to server...';
+    
+    // Upload in chunks (10,000 emails per request)
+    const chunkSize = 10000;
+    let processed = 0;
+    let added = 0;
+    let duplicates = 0;
+    
+    for (let i = 0; i < parsedEmails.length; i += chunkSize) {
+        const chunk = parsedEmails.slice(i, i + chunkSize);
+        const chunkNum = Math.floor(i / chunkSize) + 1;
+        const totalChunks = Math.ceil(parsedEmails.length / chunkSize);
+        
+        console.log(`📤 Uploading chunk ${chunkNum}/${totalChunks} (${chunk.length} emails)`);
+        document.getElementById('uploadStatusText').textContent = 
+            `Uploading chunk ${chunkNum} of ${totalChunks}...`;
+        
+        try {
+            const response = await fetch('/api/campaign/from/bulk', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({emails: chunk})
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                added += data.added;
+                duplicates += data.duplicates;
+                processed += chunk.length;
+                
+                // Update progress
+                const progress = (processed / parsedEmails.length * 100).toFixed(1);
+                document.getElementById('uploadProgressBar').style.width = progress + '%';
+                document.getElementById('uploadProgressText').textContent = progress + '%';
+                document.getElementById('emailsProcessed').textContent = processed.toLocaleString();
+                document.getElementById('emailsValid').textContent = added.toLocaleString();
+                document.getElementById('emailsDuplicates').textContent = duplicates.toLocaleString();
+                
+                console.log(`✅ Chunk ${chunkNum} complete: +${data.added} new, ${data.duplicates} duplicates`);
+            } else {
+                throw new Error(data.message || 'Upload failed');
+            }
+        } catch (error) {
+            console.error(`❌ Error uploading chunk ${chunkNum}:`, error);
+            alert(`Upload failed at chunk ${chunkNum}: ${error.message}`);
+            
+            // Re-enable controls
+            document.getElementById('fileUploadCloseBtn').disabled = false;
+            document.getElementById('fileUploadCancelBtn').disabled = false;
+            return;
+        }
+    }
+    
+    // Upload complete
+    console.log(`✅ Upload complete! Added ${added} emails, ${duplicates} duplicates removed`);
+    document.getElementById('uploadSpinner').classList.add('d-none');
+    document.getElementById('uploadStatusText').textContent = '✅ Upload Complete!';
+    document.getElementById('uploadProgressBar').classList.remove('progress-bar-animated');
+    document.getElementById('uploadProgressBar').classList.add('bg-success');
+    
+    // Show success message
+    document.getElementById('uploadSummary').innerHTML = `
+        <ul class="mb-0">
+            <li><strong>${added.toLocaleString()}</strong> new emails added</li>
+            <li><strong>${duplicates.toLocaleString()}</strong> duplicates removed</li>
+            <li><strong>${processed.toLocaleString()}</strong> total emails processed</li>
+        </ul>
+    `;
+    document.getElementById('uploadSuccessAlert').classList.remove('d-none');
+    
+    // Refresh count
+    loadFromEmails();
+    
+    // Re-enable close button
+    document.getElementById('fileUploadCloseBtn').disabled = false;
+    document.getElementById('fileUploadCancelBtn').disabled = false;
+    document.getElementById('fileUploadCancelBtn').textContent = 'Close';
 }
 
 function showRecipientsFileUpload() {
