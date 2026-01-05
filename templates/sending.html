@@ -2713,7 +2713,7 @@ function renderRecheckResults() {
                 Math.round((new Date(from.delivered_at) - new Date(from.sent_at)) / 1000) : 'N/A';
             return `
                 <tr>
-                    <td><input type="checkbox" class="working-checkbox" value="${from.email}"></td>
+                    <td><input type="checkbox" class="working-checkbox" value="${from.email}" checked></td>
                     <td>${from.email}</td>
                     <td>${new Date(from.sent_at).toLocaleString()}</td>
                     <td>${from.delivered_at ? new Date(from.delivered_at).toLocaleString() : 'N/A'}</td>
@@ -2721,6 +2721,12 @@ function renderRecheckResults() {
                 </tr>
             `;
         }).join('');
+        
+        // Auto-check "Select All" checkbox when all working emails are checked
+        const selectAllCheckbox = document.getElementById('selectAllWorking');
+        if (selectAllCheckbox) {
+            selectAllCheckbox.checked = true;
+        }
     }
     
     // Failed table
@@ -2878,6 +2884,7 @@ if (typeof socket !== 'undefined') {
     
     socket.on('recheck_response_detected', function(data) {
         console.log('📊 Counter update received:', data);
+        console.log(`   From: ${data.from_email}, Working: ${data.working_count}, Pending: ${data.pending_count}, Failed: ${data.failed_count}`);
         
         // Update stats
         try {
@@ -2897,10 +2904,14 @@ if (typeof socket !== 'undefined') {
         
         // Add to working log (prevent duplicates)
         if (!recheckWorkingEmails.has(data.from_email)) {
+            console.log(`   ✅ Adding ${data.from_email} to working set (new email)`);
             recheckWorkingEmails.add(data.from_email);
             const workingLog = document.getElementById('recheckWorkingLog');
             workingLog.value += data.from_email + '\n';
             workingLog.scrollTop = workingLog.scrollHeight; // Auto-scroll to bottom
+            console.log(`   📝 Working log now has ${recheckWorkingEmails.size} emails`);
+        } else {
+            console.log(`   ⏭️ Skipping ${data.from_email} (already in working set)`);
         }
     });
 }
