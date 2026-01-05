@@ -168,8 +168,8 @@
                         </div>
                     </div>
                 </div>
-                <div class="log-container" id="validationLogs" style="max-height: 400px; overflow-y: auto; background-color: #f8f9fa; padding: 15px; border-radius: 5px; font-family: monospace; font-size: 13px;">
-                    <div class="text-muted">Validation will start shortly...</div>
+                <div class="log-container" id="validationLogs" style="max-height: 400px; overflow-y: auto; background-color: #1a1a1a; color: #00ff00; padding: 15px; border-radius: 5px; font-family: monospace; font-size: 13px;">
+                    <div style="color: #00ff00;">Validation will start shortly...</div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -531,6 +531,7 @@ function addValidationLog(message) {
     const logContainer = document.getElementById('validationLogs');
     const logEntry = document.createElement('div');
     logEntry.className = 'log-entry';
+    logEntry.style.color = '#00ff00';
     logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
     logContainer.appendChild(logEntry);
     logContainer.scrollTop = logContainer.scrollHeight;
@@ -542,11 +543,13 @@ function updateValidationStats(stats) {
         const sent = stats.sent || 0;
         const failed = stats.failed || 0;
         const validated = stats.validated || 0;
-        const completed = sent + failed;
-        const pending = total - completed;
         
-        document.getElementById('validationProgress').textContent = `${completed}/${total}`;
-        document.getElementById('validationProgressBar').style.width = total > 0 ? `${(completed/total)*100}%` : '0%';
+        // Calculate pending as total minus validated (not sent+failed)
+        const pending = Math.max(0, total - validated);
+        
+        // Progress shows validated/total (not completed/total)
+        document.getElementById('validationProgress').textContent = `${validated}/${total}`;
+        document.getElementById('validationProgressBar').style.width = total > 0 ? `${(validated/total)*100}%` : '0%';
         document.getElementById('validatedCount').textContent = validated;
         document.getElementById('failedCount').textContent = failed;
         document.getElementById('pendingCount').textContent = pending;

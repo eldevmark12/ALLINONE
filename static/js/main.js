@@ -75,25 +75,30 @@ window.appUtils = {
 // Initialize Socket.IO connection with optimized settings for render.com
 try {
     if (typeof io !== 'undefined') {
-        window.socket = io({
-            transports: ['polling', 'websocket'],  // Start with polling for better compatibility
-            reconnection: true,
-            reconnectionDelay: 2000,
-            reconnectionDelayMax: 10000,
-            reconnectionAttempts: Infinity,
-            timeout: 60000,  // Increased from 20s to 60s for render.com
-            pingTimeout: 60000,  // Time to wait for pong response (60s for render.com)
-            pingInterval: 25000,  // How often to send ping (25s)
-            autoConnect: true,
-            forceNew: false,
-            multiplex: true,
-            upgrade: true,
-            rememberUpgrade: true,
-            // Additional render.com-specific settings
-            path: '/socket.io/',
-            secure: true,
-            rejectUnauthorized: false
-        });
+        // Check if socket already exists (prevent multiple connections)
+        if (window.socket && window.socket.connected) {
+            console.log('✅ Socket.IO already connected - reusing existing connection');
+        } else {
+            window.socket = io({
+                transports: ['polling', 'websocket'],  // Start with polling for better compatibility
+                reconnection: true,
+                reconnectionDelay: 2000,
+                reconnectionDelayMax: 10000,
+                reconnectionAttempts: Infinity,
+                timeout: 60000,  // Increased from 20s to 60s for render.com
+                pingTimeout: 60000,  // Time to wait for pong response (60s for render.com)
+                pingInterval: 25000,  // How often to send ping (25s)
+                autoConnect: true,
+                forceNew: false,
+                multiplex: true,
+                upgrade: true,
+                rememberUpgrade: true,
+                // Additional render.com-specific settings
+                path: '/socket.io/',
+                secure: true,
+                rejectUnauthorized: false
+            });
+        }
         
         socket.on('connect', function() {
             console.log('✅ Socket.IO connected (transport:', socket.io.engine.transport.name, ')');
