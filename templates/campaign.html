@@ -571,41 +571,19 @@ function loadDefaultTemplate() {
 // Get default HTML email template
 function getDefaultTemplate() {
     return `<html>
-<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
-    <div style="background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-        <h2 style="color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px;">Important Security Alert</h2>
-        
-        <p>Dear Valued Customer,</p>
-        
-        <p>We have detected unusual activity on your account from IP address <strong>{{RANDOM}}</strong> and need to verify your identity immediately.</p>
-        
-        <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0;">
-            <strong style="color: #856404;">⚠️ Action Required:</strong>
-            <br>Please verify your account information within 24 hours to avoid suspension.
-            <br>Verification Code: <code style="background-color: #f8f9fa; padding: 2px 6px; border-radius: 3px;">{{RANDOM10}}</code>
-        </div>
-        
-        <p style="text-align: center; margin: 30px 0;">
-            <a href="#" style="background-color: #3498db; color: white; padding: 14px 35px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
-                Verify Account Now
-            </a>
-        </p>
-        
-        <p>If you did not request this verification, please contact our support team immediately.</p>
-        
-        <p style="color: #7f8c8d; font-size: 13px; margin-top: 25px;">
-            Reference ID: {{RANDOM5}}-{{RANDOM5}}-{{RANDOM5}}
-        </p>
-        
-        <br>
-        <p>Best regards,<br><strong>Security Team</strong></p>
-        
-        <hr style="border: none; border-top: 1px solid #ddd; margin: 25px 0;">
-        <p style="color: #999; font-size: 11px; text-align: center;">
-            This is an automated security notification. Please do not reply to this email.
-            <br>If you have questions, visit our support center.
-        </p>
-    </div>
+<body style="font-family: Arial, sans-serif; padding: 20px;">
+    <p>Hello,</p>
+    
+    <p>This is an automated message regarding your account.</p>
+    
+    <p>Reference: <strong>{{RANDOM8}}</strong></p>
+    <br>
+    <p>Code: {{RANDOM6}}</p>
+    <br>
+    <p>ID: {{RANDOM10}}</p>
+    <br>
+    
+    <p>Thank you.</p>
 </body>
 </html>`;
 }
@@ -937,8 +915,9 @@ async function startFileUpload() {
     document.getElementById('fileUploadCancelBtn').disabled = true;
     document.getElementById('uploadStatusText').textContent = 'Uploading emails to server...';
     
-    // Sequential upload mode for better reliability on Render.com free tier
-    const chunkSize = 5000; // Smaller chunks (5K instead of 10K) = faster per-request
+    // Parallel upload mode with larger chunks for faster processing
+    const chunkSize = 10000; // 10K emails per chunk
+    const parallelLimit = 50; // Upload 50 chunks at once
     let processed = 0;
     let added = 0;
     let duplicates = 0;
@@ -953,57 +932,54 @@ async function startFileUpload() {
     }
     
     console.log(`📦 Split into ${totalChunks} chunks of ~${chunkSize} emails each`);
-    console.log(`🔄 Sequential upload mode (safer for large files on free tier)`);
+    console.log(`� Parallel upload mode: ${parallelLimit} chunks at a time for faster processing`);
     
-    // Upload chunks SEQUENTIALLY (not parallel) for reliability
-    for (let i = 0; i < chunks.length; i++) {
+    // Upload chunks in parallel batches
+    for (let i = 0; i < chunks.length; i += parallelLimit) {
         if (hasError) break;
         
-        const chunk = chunks[i];
-        const chunkNum = i + 1;
+        const batch = chunks.slice(i, i + parallelLimit);
+        const batchStart = i + 1;
+        const batchEnd = Math.min(i + parallelLimit, chunks.length);
         
+        console.log(`📤 Uploading batch: chunks ${batchStart}-${batchEnd} of ${totalChunks}`);
         document.getElementById('uploadStatusText').textContent = 
-            `Uploading chunk ${chunkNum} of ${totalChunks}...`;
+            `Uploading chunks ${batchStart}-${batchEnd} of ${totalChunks}...`;
         
-        // Upload with retry logic (3 attempts)
-        let retryCount = 0;
-        let success = false;
-        let result = null;
+        // Upload all chunks in this batch concurrently
+        const uploadPromises = batch.map((chunk, batchIndex) => {
+            const chunkNum = i + batchIndex + 1;
+            return uploadChunk(chunk, chunkNum, totalChunks);
+        });
         
-        while (retryCount < 3 && !success) {
-            if (retryCount > 0) {
-                console.log(`🔄 Retry ${retryCount}/3 for chunk ${chunkNum}...`);
-                await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 sec before retry
-            }
+        try {
+            const results = await Promise.all(uploadPromises);
             
-            result = await uploadChunk(chunk, chunkNum, totalChunks);
-            
-            if (result.success) {
-                success = true;
-                added += result.added;
-                duplicates += result.duplicates;
-                processed += chunk.length;
-                console.log(`✅ Chunk ${chunkNum}/${totalChunks}: +${result.added} new, ${result.duplicates} duplicates`);
-            } else {
-                retryCount++;
-                if (retryCount >= 3) {
-                    console.error(`❌ Chunk ${chunkNum} failed after 3 attempts: ${result.error}`);
+            // Aggregate results
+            results.forEach((result, idx) => {
+                if (result.success) {
+                    added += result.added;
+                    duplicates += result.duplicates;
+                    processed += batch[idx].length;
+                    console.log(`✅ Chunk ${i + idx + 1}/${totalChunks}: +${result.added} new, ${result.duplicates} duplicates`);
+                } else {
+                    console.error(`❌ Chunk ${i + idx + 1} failed: ${result.error}`);
                     hasError = true;
                 }
-            }
-        }
-        
-        // Update progress after each chunk
-        const progress = (processed / parsedEmails.length * 100).toFixed(1);
-        document.getElementById('uploadProgressBar').style.width = progress + '%';
-        document.getElementById('uploadProgressText').textContent = progress + '%';
-        document.getElementById('emailsProcessed').textContent = processed.toLocaleString();
-        document.getElementById('emailsValid').textContent = added.toLocaleString();
-        document.getElementById('emailsDuplicates').textContent = duplicates.toLocaleString();
-        
-        // Small delay between chunks to prevent overwhelming server
-        if (i < chunks.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay
+            });
+            
+            // Update progress after batch
+            const progress = (processed / parsedEmails.length * 100).toFixed(1);
+            document.getElementById('uploadProgressBar').style.width = progress + '%';
+            document.getElementById('uploadProgressText').textContent = progress + '%';
+            document.getElementById('emailsProcessed').textContent = processed.toLocaleString();
+            document.getElementById('emailsValid').textContent = added.toLocaleString();
+            document.getElementById('emailsDuplicates').textContent = duplicates.toLocaleString();
+            
+        } catch (error) {
+            console.error(`❌ Batch upload error:`, error);
+            hasError = true;
+            break;
         }
     }
     
