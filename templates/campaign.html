@@ -796,9 +796,9 @@ async function startFileUpload() {
     document.getElementById('fileUploadCancelBtn').disabled = true;
     document.getElementById('uploadStatusText').textContent = 'Uploading emails to server...';
     
-    // Upload in parallel batches (10K emails per chunk, 5 concurrent requests)
+    // Upload in parallel batches (10K emails per chunk, 50 concurrent requests)
     const chunkSize = 10000;
-    const parallelLimit = 5; // Upload 5 chunks at once
+    const parallelLimit = 50; // Upload 50 chunks at once
     let processed = 0;
     let added = 0;
     let duplicates = 0;
