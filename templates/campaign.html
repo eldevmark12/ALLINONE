@@ -619,8 +619,23 @@ function getDefaultTemplate() {
 }
 
 // Load from emails
+// Load from emails count
+let fromEmailsCache = null;
+let fromEmailsCacheTime = 0;
+const CACHE_DURATION = 5000; // 5 seconds
+
 function loadFromEmails() {
     console.log('📧 Loading from emails count...');
+    
+    // Use cache if available and fresh
+    const now = Date.now();
+    if (fromEmailsCache && (now - fromEmailsCacheTime < CACHE_DURATION)) {
+        console.log('✅ Using cached from emails count:', fromEmailsCache);
+        document.getElementById('fromCount').textContent = fromEmailsCache;
+        document.getElementById('fromCountLarge').textContent = fromEmailsCache.toLocaleString();
+        return;
+    }
+    
     // Add cache-busting parameter to force fresh data
     const cacheBuster = `?t=${Date.now()}`;
     fetch(`/api/campaign/from/list${cacheBuster}`)
@@ -628,6 +643,8 @@ function loadFromEmails() {
         .then(data => {
             if (data.success) {
                 console.log(`✅ From emails loaded: ${data.count}`);
+                fromEmailsCache = data.count;
+                fromEmailsCacheTime = Date.now();
                 document.getElementById('fromCount').textContent = data.count;
                 document.getElementById('fromCountLarge').textContent = data.count.toLocaleString();
             } else {
@@ -638,13 +655,28 @@ function loadFromEmails() {
 }
 
 // Load recipients
+let recipientsCache = null;
+let recipientsCacheTime = 0;
+
 function loadRecipients() {
     console.log('👥 Loading recipients count...');
+    
+    // Use cache if available and fresh
+    const now = Date.now();
+    if (recipientsCache && (now - recipientsCacheTime < CACHE_DURATION)) {
+        console.log('✅ Using cached recipients count:', recipientsCache);
+        document.getElementById('recipientCount').textContent = recipientsCache;
+        document.getElementById('recipientCountLarge').textContent = recipientsCache.toLocaleString();
+        return;
+    }
+    
     fetch('/api/campaign/recipients/list')
         .then(res => res.json())
         .then(data => {
             if (data.success) {
                 console.log(`✅ Recipients loaded: ${data.count}`);
+                recipientsCache = data.count;
+                recipientsCacheTime = Date.now();
                 document.getElementById('recipientCount').textContent = data.count;
                 document.getElementById('recipientCountLarge').textContent = data.count.toLocaleString();
             } else {
@@ -1213,11 +1245,15 @@ function checkCampaignStatus() {
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 Campaign page loaded - Initializing...');
+    
+    // Initialize socket first
     initCampaignSocket();
-    loadConfig();
-    loadFromEmails();
-    loadRecipients();
-    checkCampaignStatus();
+    
+    // Stagger API calls to prevent overwhelming the server
+    setTimeout(() => loadConfig(), 100);
+    setTimeout(() => loadFromEmails(), 300);
+    setTimeout(() => loadRecipients(), 500);
+    setTimeout(() => checkCampaignStatus(), 700);
     
     console.log('✅ Campaign page initialization complete');
     console.log('📡 Socket.IO handles real-time updates - no polling needed');
