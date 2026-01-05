@@ -331,21 +331,27 @@ function initCampaignSocket() {
         campaignSocket.off('from_count_update');
         campaignSocket.off('campaign_complete');
         
+        console.log('🔌 Campaign Socket.IO connected');
+        
         campaignSocket.on('campaign_log', function(data) {
+            console.log(`📝 Campaign Log [${data.type}]:`, data.message);
             addConsoleLog(data.message, data.type || 'info');
         });
         
         campaignSocket.on('campaign_stats', function(data) {
+            console.log('📊 Campaign Stats:', data);
             updateStats(data);
         });
         
         campaignSocket.on('from_count_update', function(data) {
             // Update from email count in real-time as emails are used
+            console.log(`📧 From count updated: ${data.remaining} remaining`);
             document.getElementById('fromCount').textContent = data.remaining;
             document.getElementById('fromCountLarge').textContent = data.remaining.toLocaleString();
         });
         
         campaignSocket.on('campaign_complete', function(data) {
+            console.log('✅ Campaign completed:', data);
             campaignRunning = false;
             document.getElementById('startBtn').style.display = 'inline-block';
             document.getElementById('stopBtn').style.display = 'none';
@@ -411,26 +417,36 @@ function saveConfig() {
 
 // Load from emails
 function loadFromEmails() {
+    console.log('📧 Loading from emails count...');
     fetch('/api/campaign/from/list')
         .then(res => res.json())
         .then(data => {
             if (data.success) {
+                console.log(`✅ From emails loaded: ${data.count}`);
                 document.getElementById('fromCount').textContent = data.count;
                 document.getElementById('fromCountLarge').textContent = data.count.toLocaleString();
+            } else {
+                console.error('❌ Failed to load from emails:', data);
             }
-        });
+        })
+        .catch(err => console.error('❌ Error loading from emails:', err));
 }
 
 // Load recipients
 function loadRecipients() {
+    console.log('👥 Loading recipients count...');
     fetch('/api/campaign/recipients/list')
         .then(res => res.json())
         .then(data => {
             if (data.success) {
+                console.log(`✅ Recipients loaded: ${data.count}`);
                 document.getElementById('recipientCount').textContent = data.count;
                 document.getElementById('recipientCountLarge').textContent = data.count.toLocaleString();
+            } else {
+                console.error('❌ Failed to load recipients:', data);
             }
-        });
+        })
+        .catch(err => console.error('❌ Error loading recipients:', err));
 }
 
 // Show bulk from modal
@@ -446,6 +462,8 @@ function processBulkFrom() {
         .map(e => e.trim())
         .filter(e => e && e.includes('@'));
     
+    console.log(`📧 Processing ${emails.length} from emails...`);
+    
     if (emails.length === 0) {
         alert('No valid email addresses found');
         return;
@@ -459,11 +477,19 @@ function processBulkFrom() {
     .then(res => res.json())
     .then(data => {
         if (data.success) {
+            console.log(`✅ Added ${data.added} from emails. Total: ${data.total}, Duplicates: ${data.duplicates}`);
             bootstrap.Modal.getInstance(document.getElementById('bulkFromModal')).hide();
             document.getElementById('bulkFromInput').value = '';
-            loadFromEmails();
+            loadFromEmails(); // Refresh count
             showAlert(`Successfully added ${data.added} new emails. Total: ${data.total.toLocaleString()} (${data.duplicates} duplicates removed)`, 'success');
+        } else {
+            console.error('❌ Failed to add from emails:', data);
+            showAlert(data.message || 'Failed to add emails', 'danger');
         }
+    })
+    .catch(err => {
+        console.error('❌ Error adding from emails:', err);
+        showAlert('Network error while adding emails', 'danger');
     });
 }
 
@@ -480,6 +506,8 @@ function processBulkRecipients() {
         .map(e => e.trim())
         .filter(e => e && e.includes('@'));
     
+    console.log(`👥 Processing ${emails.length} recipient emails...`);
+    
     if (emails.length === 0) {
         alert('No valid email addresses found');
         return;
@@ -493,24 +521,41 @@ function processBulkRecipients() {
     .then(res => res.json())
     .then(data => {
         if (data.success) {
+            console.log(`✅ Added ${data.added} recipients. Total: ${data.total}, Duplicates: ${data.duplicates}`);
             bootstrap.Modal.getInstance(document.getElementById('bulkRecipientsModal')).hide();
             document.getElementById('bulkRecipientsInput').value = '';
-            loadRecipients();
+            loadRecipients(); // Refresh count
             showAlert(`Successfully added ${data.added} new emails. Total: ${data.total.toLocaleString()} (${data.duplicates} duplicates removed)`, 'success');
+        } else {
+            console.error('❌ Failed to add recipients:', data);
+            showAlert(data.message || 'Failed to add emails', 'danger');
         }
+    })
+    .catch(err => {
+        console.error('❌ Error adding recipients:', err);
+        showAlert('Network error while adding emails', 'danger');
     });
 }
 
 // Clear from list
 function clearFromList() {
     if (confirm('Are you sure you want to delete ALL from emails? This action cannot be undone!')) {
+        console.log('🗑️ Clearing all from emails...');
         fetch('/api/campaign/from/clear', {method: 'POST'})
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
-                    loadFromEmails();
+                    console.log('✅ All from emails deleted');
+                    loadFromEmails(); // Refresh count
                     showAlert('All from emails have been deleted', 'warning');
+                } else {
+                    console.error('❌ Failed to clear from emails:', data);
+                    showAlert(data.message || 'Failed to clear emails', 'danger');
                 }
+            })
+            .catch(err => {
+                console.error('❌ Error clearing from emails:', err);
+                showAlert('Network error while clearing emails', 'danger');
             });
     }
 }
@@ -518,13 +563,22 @@ function clearFromList() {
 // Clear recipients list
 function clearRecipientsList() {
     if (confirm('Are you sure you want to delete ALL recipients? This action cannot be undone!')) {
+        console.log('🗑️ Clearing all recipients...');
         fetch('/api/campaign/recipients/clear', {method: 'POST'})
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
-                    loadRecipients();
+                    console.log('✅ All recipients deleted');
+                    loadRecipients(); // Refresh count
                     showAlert('All recipients have been deleted', 'warning');
+                } else {
+                    console.error('❌ Failed to clear recipients:', data);
+                    showAlert(data.message || 'Failed to clear recipients', 'danger');
                 }
+            })
+            .catch(err => {
+                console.error('❌ Error clearing recipients:', err);
+                showAlert('Network error while clearing recipients', 'danger');
             });
     }
 }
@@ -650,11 +704,15 @@ function checkCampaignStatus() {
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Campaign page loaded - Initializing...');
     initCampaignSocket();
     loadConfig();
     loadFromEmails();
     loadRecipients();
     checkCampaignStatus();
+    
+    console.log('✅ Campaign page initialization complete');
+    console.log('📡 Socket.IO handles real-time updates - no polling needed');
     
     // Socket.IO handles real-time count updates during campaign
     // No polling needed - Socket.IO 'from_count_update' event updates counts automatically
