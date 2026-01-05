@@ -79,6 +79,13 @@ def send_test_email(account, callback=None):
         with tracking_lock:
             sent_tracking_ids[tracking_id] = account
         
+        # ✅ INCREMENT SMTP SENT COUNTER (validation test email counts too)
+        try:
+            from app import increment_smtp_sent_count
+            increment_smtp_sent_count(account['email'])
+        except Exception as counter_error:
+            print(f"⚠️ Failed to update SMTP counter: {str(counter_error)[:50]}")
+        
         if callback:
             callback({'type': 'success', 'email': account['email'], 'tracking_id': tracking_id})
         

@@ -952,7 +952,7 @@ def run_campaign_background(recipients, from_emails, smtp_servers, html_content,
         campaign_process = None
 
 def update_smtp_sent_counts(smtp_stats):
-    """Update SMTP sent counts in smtp.txt"""
+    """Update SMTP sent counts in smtp.txt (batch mode for campaign sender)"""
     try:
         smtp_file = os.path.join(BASIC_FOLDER, 'smtp.txt')
         if not os.path.exists(smtp_file):
@@ -975,6 +975,59 @@ def update_smtp_sent_counts(smtp_stats):
                         f.write(f"{parts[0]},{parts[1]},{parts[2]},{parts[3]},{status},{new_sent}\n")
     except Exception as e:
         print(f"Error updating SMTP counts: {e}")
+
+# Global lock for SMTP counter updates (thread-safe)
+smtp_counter_lock = threading.Lock()
+
+def increment_smtp_sent_count(smtp_username):
+    """
+    Increment sent count for a specific SMTP server by 1.
+    Thread-safe and works across all sending systems (Campaign, Recheck, Sending).
+    Call this immediately after successful email send.
+    
+    Args:
+        smtp_username: The username/email of the SMTP server that sent the email
+    """
+    with smtp_counter_lock:
+        try:
+            smtp_file = os.path.join(BASIC_FOLDER, 'smtp.txt')
+            if not os.path.exists(smtp_file):
+                print(f"[SMTP COUNTER] smtp.txt not found")
+                return
+            
+            # Read all lines
+            with open(smtp_file, 'r') as f:
+                lines = f.readlines()
+            
+            # Update the specific SMTP's sent count
+            updated = False
+            with open(smtp_file, 'w') as f:
+                f.write(lines[0])  # Write header
+                for line in lines[1:]:
+                    if line.strip():
+                        parts = line.strip().split(',')
+                        if len(parts) >= 4:
+                            current_username = parts[2].strip()
+                            
+                            if current_username == smtp_username:
+                                # Increment this SMTP's count
+                                current_sent = int(parts[5].strip()) if len(parts) > 5 else 0
+                                new_sent = current_sent + 1
+                                status = parts[4].strip() if len(parts) > 4 else 'inactive'
+                                f.write(f"{parts[0]},{parts[1]},{parts[2]},{parts[3]},{status},{new_sent}\n")
+                                updated = True
+                                print(f"[SMTP COUNTER] ✅ {smtp_username}: {current_sent} → {new_sent}")
+                            else:
+                                # Keep other SMTPs unchanged
+                                f.write(line)
+            
+            if not updated:
+                print(f"[SMTP COUNTER] ⚠️ SMTP '{smtp_username}' not found in smtp.txt")
+                
+        except Exception as e:
+            print(f"[SMTP COUNTER] ❌ Error incrementing count for {smtp_username}: {e}")
+            import traceback
+            traceback.print_exc()
 
 # Email Monitoring API Endpoints
 EMAIL_API_KEY = os.getenv('EMAIL_API_KEY', '@oldisgold@')
@@ -2073,6 +2126,9 @@ def run_recheck_campaign():
                     # Reset failure count on success
                     smtp_server['failures'] = 0
                     
+                    # ✅ INCREMENT SMTP SENT COUNTER
+                    increment_smtp_sent_count(smtp_server['username'])
+                    
                 except Exception as e:
                     emit_log(f'⚠️ Failed to {recipient}: {str(e)[:80]}', 'warning')
                     continue
@@ -2466,6 +2522,9 @@ def run_sending_campaign():
                 sent_count += 1
                 emit_log(f'✉️ SUCCESS! Sent #{sent_count} to {recipient} from {current_from}', 'success')
                 emit_stats(sent_count)
+                
+                # ✅ INCREMENT SMTP SENT COUNTER
+                increment_smtp_sent_count(smtp_server['username'])
                 
             except Exception as e:
                 emit_log(f'❌ FAILED to {recipient}: {str(e)[:100]}', 'error')

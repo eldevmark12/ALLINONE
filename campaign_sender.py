@@ -10,6 +10,10 @@ import uuid
 import time
 import os
 
+# Import SMTP counter function from app.py
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 class CampaignSender:
     def __init__(self, config, callback=None, from_file_path=None):
         self.config = config
@@ -160,6 +164,13 @@ class CampaignSender:
             self.total_sent += 1
             self.increment_smtp_sent(smtp_server['username'])
             self.update_stats()
+            
+            # ✅ UPDATE SMTP SENT COUNT IN smtp.txt (REAL-TIME)
+            try:
+                from app import increment_smtp_sent_count
+                increment_smtp_sent_count(smtp_server['username'])
+            except Exception as counter_error:
+                self.log(f"⚠️ Failed to update SMTP counter: {str(counter_error)[:50]}", 'warning')
             
             # Log success
             success_msg = f"✓ SENT to {recipient} | From: {from_email} | SMTP: {smtp_server['username']} | {self.total_sent} sent"
