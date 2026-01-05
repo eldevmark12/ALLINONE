@@ -796,8 +796,8 @@ async function startFileUpload() {
     document.getElementById('fileUploadCancelBtn').disabled = true;
     document.getElementById('uploadStatusText').textContent = 'Uploading emails to server...';
     
-    // Upload in chunks (10,000 emails per request)
-    const chunkSize = 10000;
+    // Upload in smaller chunks (5,000 emails per request for better reliability)
+    const chunkSize = 5000;
     let processed = 0;
     let added = 0;
     let duplicates = 0;
@@ -812,13 +812,28 @@ async function startFileUpload() {
             `Uploading chunk ${chunkNum} of ${totalChunks}...`;
         
         try {
+            // Add timeout to fetch request
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+            
+            console.log(`   🔄 Sending POST request to /api/campaign/from/bulk...`);
             const response = await fetch('/api/campaign/from/bulk', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({emails: chunk})
+                body: JSON.stringify({emails: chunk}),
+                signal: controller.signal
             });
             
+            clearTimeout(timeoutId);
+            
+            console.log(`   📡 Response status: ${response.status}`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
             const data = await response.json();
+            console.log(`   📊 Response data:`, data);
             
             if (data.success) {
                 added += data.added;
@@ -835,15 +850,27 @@ async function startFileUpload() {
                 
                 console.log(`✅ Chunk ${chunkNum} complete: +${data.added} new, ${data.duplicates} duplicates`);
             } else {
-                throw new Error(data.message || 'Upload failed');
+                throw new Error(data.message || data.error || 'Upload failed');
             }
+            
+            // Small delay between chunks to prevent overwhelming server
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
         } catch (error) {
             console.error(`❌ Error uploading chunk ${chunkNum}:`, error);
-            alert(`Upload failed at chunk ${chunkNum}: ${error.message}`);
+            
+            let errorMsg = error.message;
+            if (error.name === 'AbortError') {
+                errorMsg = 'Request timeout - server took too long to respond';
+            }
+            
+            alert(`Upload failed at chunk ${chunkNum}/${totalChunks}:\n${errorMsg}\n\nProcessed so far: ${processed.toLocaleString()} emails\nAdded: ${added.toLocaleString()}\n\nYou can try again with the remaining emails.`);
             
             // Re-enable controls
             document.getElementById('fileUploadCloseBtn').disabled = false;
             document.getElementById('fileUploadCancelBtn').disabled = false;
+            document.getElementById('fileUploadCancelBtn').textContent = 'Close';
+            document.getElementById('uploadStatusText').textContent = `❌ Upload stopped at chunk ${chunkNum}`;
             return;
         }
     }

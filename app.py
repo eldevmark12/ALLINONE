@@ -600,23 +600,33 @@ def bulk_add_from_emails():
         data = request.get_json()
         new_emails = data.get('emails', [])
         
+        print(f"📥 Bulk add request: {len(new_emails)} emails")
+        
         from_file = os.path.join(BASIC_FOLDER, 'from.txt')
         existing_emails = []
         
         if os.path.exists(from_file):
             with open(from_file, 'r') as f:
                 existing_emails = [line.strip() for line in f if line.strip()]
+            print(f"📂 Existing emails in file: {len(existing_emails)}")
         
         # Combine and remove duplicates
+        print(f"🔄 Combining and removing duplicates...")
         all_emails = list(set(existing_emails + new_emails))
         duplicates = len(existing_emails) + len(new_emails) - len(all_emails)
+        added = len(all_emails) - len(existing_emails)
         
+        print(f"💾 Writing {len(all_emails)} emails to file...")
         with open(from_file, 'w') as f:
             for email in all_emails:
                 f.write(f"{email}\n")
         
-        return jsonify({'success': True, 'added': len(all_emails) - len(existing_emails), 'duplicates': duplicates, 'total': len(all_emails)})
+        print(f"✅ Bulk add complete: +{added} new, {duplicates} duplicates, {len(all_emails)} total")
+        return jsonify({'success': True, 'added': added, 'duplicates': duplicates, 'total': len(all_emails)})
     except Exception as e:
+        print(f"❌ Error in bulk_add_from_emails: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/campaign/from/delete', methods=['POST'])
