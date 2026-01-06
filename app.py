@@ -184,6 +184,11 @@ def index():
         return redirect(url_for('dashboard'))
     return redirect(url_for('login'))
 
+@app.route('/healthz')
+def healthz():
+    """Simple health check for Render.com"""
+    return jsonify({'status': 'ok', 'timestamp': datetime.now().isoformat()}), 200
+
 @app.route('/health')
 def health_check():
     """Health check endpoint with filesystem persistence test"""
