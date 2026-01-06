@@ -15,6 +15,10 @@
         <div class="container-fluid">
             <a class="navbar-brand" href="/">
                 <i class="bi bi-envelope-fill"></i> ALL-in-One Email Portal
+                <small class="text-muted ms-2" style="font-size: 0.75rem;" id="systemInfo">
+                    <span id="appVersion">v2.0.0</span> | 
+                    <span id="systemIP">Loading...</span>
+                </small>
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -159,6 +163,29 @@
         
         // Update status every 15 seconds (increased from 10s to reduce load on Render)
         statusCheckInterval = setInterval(updateCampaignStatusBadge, 15000);
+        
+        // Load system info (version and IP)
+        function loadSystemInfo() {
+            fetch('/api/system/info')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('appVersion').textContent = data.version;
+                        document.getElementById('systemIP').textContent = data.public_ip || data.local_ip;
+                    }
+                })
+                .catch(err => {
+                    console.warn('Could not load system info:', err);
+                    document.getElementById('systemIP').textContent = 'Unknown';
+                });
+        }
+        
+        // Load system info on page load
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', loadSystemInfo);
+        } else {
+            loadSystemInfo();
+        }
     </script>
     {% endif %}
     {% block extra_js %}{% endblock %}

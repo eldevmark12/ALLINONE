@@ -8,8 +8,12 @@ from flask import Flask, render_template, request, jsonify, session, redirect, u
 from flask_socketio import SocketIO, emit
 from dotenv import load_dotenv
 import time
+import socket
 
 load_dotenv()
+
+# Application version
+APP_VERSION = "v2.0.0"
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'your-secret-key-change-in-production')
@@ -188,6 +192,36 @@ def index():
 def healthz():
     """Simple health check for Render.com"""
     return jsonify({'status': 'ok', 'timestamp': datetime.now().isoformat()}), 200
+
+@app.route('/api/system/info')
+def system_info():
+    """Get system information including IP and version"""
+    try:
+        # Get server IP address
+        hostname = socket.gethostname()
+        local_ip = socket.gethostbyname(hostname)
+        
+        # Try to get public IP (if available)
+        try:
+            import requests
+            public_ip = requests.get('https://api.ipify.org', timeout=2).text
+        except:
+            public_ip = local_ip
+        
+        return jsonify({
+            'success': True,
+            'version': APP_VERSION,
+            'hostname': hostname,
+            'local_ip': local_ip,
+            'public_ip': public_ip,
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'version': APP_VERSION,
+            'error': str(e)
+        })
 
 @app.route('/health')
 def health_check():
