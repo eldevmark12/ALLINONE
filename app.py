@@ -13,7 +13,7 @@ import socket
 load_dotenv()
 
 # Application version
-APP_VERSION = "v2.0.0"
+APP_VERSION = "v2.0.1"
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'your-secret-key-change-in-production')
