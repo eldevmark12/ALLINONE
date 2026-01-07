@@ -23,13 +23,47 @@
                     <label for="password" class="form-label">Password</label>
                     <input type="password" class="form-control form-control-lg" id="password" name="password" required autofocus>
                 </div>
-                <button type="submit" class="btn btn-primary btn-lg w-100">
+                <button type="submit" class="btn btn-primary btn-lg w-100" id="loginBtn">
                     <i class="bi bi-box-arrow-in-right"></i> Login
                 </button>
+                <div id="loadingIndicator" class="text-center mt-3" style="display: none;">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="text-muted mt-2">Connecting to server...</p>
+                </div>
+                <div id="errorIndicator" class="alert alert-danger mt-3" role="alert" style="display: none;">
+                    <i class="bi bi-exclamation-triangle-fill"></i> Server is temporarily unavailable. Please wait a moment and try again.
+                </div>
             </form>
         </div>
     </div>
 </div>
+
+<script>
+document.getElementById('loginForm').addEventListener('submit', function(e) {
+    const btn = document.getElementById('loginBtn');
+    const loading = document.getElementById('loadingIndicator');
+    const error = document.getElementById('errorIndicator');
+    
+    // Show loading, hide button
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Logging in...';
+    loading.style.display = 'block';
+    error.style.display = 'none';
+    
+    // Set timeout to detect hung request (30 seconds)
+    const timeout = setTimeout(() => {
+        // If still loading after 30 seconds, show error
+        error.style.display = 'block';
+        loading.style.display = 'none';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-box-arrow-in-right"></i> Try Again';
+    }, 30000);
+    
+    // The form will submit naturally - this just adds UI feedback
+});
+</script>
 
 <style>
     body {
