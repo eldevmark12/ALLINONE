@@ -232,50 +232,41 @@ function initSocket() {
     socketInitAttempts++;
     
     if (socketInitAttempts > MAX_SOCKET_INIT_ATTEMPTS) {
-        console.warn('❌ Max Socket.IO init attempts reached - stopping to prevent freeze');
+        console.warn('❌ Max Socket.IO init attempts reached - using polling fallback only');
+        socketConnected = false;
         return;
     }
     
-    if (typeof io !== 'undefined') {
-        // Use global socket if available, otherwise create new one
-        if (window.socket && window.socket.connected) {
-            console.log('✅ Using existing Socket.IO connection');
-            socket = window.socket;
-        } else if (!socket || !socket.connected) {
-            console.log('🔌 Initializing SMTP page Socket.IO connection...');
-            socket = io({
-                transports: ['polling'],  // Use ONLY polling to prevent WebSocket crashes
-                reconnection: true,
-                reconnectionAttempts: 5,  // Limit attempts
-                timeout: 20000,
-                autoConnect: true
-            });
-            
-            socket.on('connect', function() {
-                console.log('✅ SMTP Socket.IO connected');
-                socketConnected = true;
-                stopPollingFallback(); // Stop polling if Socket.IO connects
-            });
-            
-            socket.on('connect_error', function(error) {
-                console.warn('⚠️ SMTP Socket connection error:', error.message);
-                socketConnected = false;
-                // If validating and Socket.IO fails, start polling fallback
-                if (isValidating) {
-                    console.log('🔄 Socket.IO failed during validation - starting polling fallback');
-                    startPollingFallback();
-                }
-            });
-            
-            socket.on('disconnect', function() {
-                console.warn('⚠️ Socket.IO disconnected');
-                socketConnected = false;
-                // If validating and Socket.IO disconnects, start polling fallback
-                if (isValidating) {
-                    console.log('🔄 Socket.IO disconnected during validation - starting polling fallback');
-                    startPollingFallback();
-                }
-            });
+    // Use global socket from base.html (always available)
+    if (window.socket) {
+        console.log('✅ Using global Socket.IO connection from base.html');
+        socket = window.socket;
+        socketConnected = window.socket.connected;
+        
+        // Register event handlers
+        socket.on('connect', function() {
+            console.log('✅ SMTP Socket.IO connected');
+            socketConnected = true;
+            stopPollingFallback();
+        });
+        
+        socket.on('disconnect', function() {
+            console.warn('⚠️ Socket.IO disconnected');
+            socketConnected = false;
+            if (isValidating) {
+                console.log('🔄 Socket.IO disconnected during validation - starting polling fallback');
+                startPollingFallback();
+            }
+        });
+        
+        socket.on('connect_error', function(error) {
+            console.warn('⚠️ SMTP Socket connection error:', error.message);
+            socketConnected = false;
+            if (isValidating) {
+                console.log('🔄 Socket.IO failed during validation - starting polling fallback');
+                startPollingFallback();
+            }
+        });
         }
         
         // Register event handlers
@@ -296,9 +287,9 @@ function initSocket() {
             }, 2000);
         });
     } else {
-        if (socketInitAttempts <= MAX_SOCKET_INIT_ATTEMPTS) {
-            setTimeout(initSocket, 200); // Retry after 200ms (increased from 100ms)
-        }
+        // No socket available, rely on polling fallback
+        console.warn('⚠️ window.socket not available - will use polling fallback only');
+        socketConnected = false;
     }
 }
 

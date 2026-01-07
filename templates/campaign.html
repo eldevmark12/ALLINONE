@@ -454,33 +454,14 @@ function initCampaignSocket() {
     campaignSocketInitAttempts++;
     
     if (campaignSocketInitAttempts > MAX_CAMPAIGN_SOCKET_ATTEMPTS) {
-        console.warn('❌ Max campaign socket init attempts reached - stopping to prevent freeze');
+        console.warn('❌ Max campaign socket init attempts reached - using polling fallback only');
         return;
     }
     
-    if (typeof io !== 'undefined') {
-        // Use global socket if available
-        if (window.socket && window.socket.connected) {
-            console.log('✅ Using existing global Socket.IO connection for campaign');
-            campaignSocket = window.socket;
-        } else if (!campaignSocket || !campaignSocket.connected) {
-            console.log('🔌 Initializing Campaign Socket.IO connection...');
-            campaignSocket = io({
-                transports: ['polling'],  // Use ONLY polling to prevent WebSocket crashes
-                reconnection: true,
-                reconnectionAttempts: 5,  // Limit attempts
-                timeout: 20000,
-                autoConnect: true
-            });
-            
-            campaignSocket.on('connect', function() {
-                console.log('✅ Campaign Socket.IO connected');
-            });
-            
-            campaignSocket.on('connect_error', function(error) {
-                console.warn('⚠️ Campaign Socket connection error:', error.message);
-            });
-        }
+    // Use global socket from base.html (always available)
+    if (window.socket) {
+        console.log('✅ Using global Socket.IO connection for campaign');
+        campaignSocket = window.socket;
         
         // Remove existing listeners to prevent duplicates
         campaignSocket.off('campaign_log');
@@ -488,7 +469,7 @@ function initCampaignSocket() {
         campaignSocket.off('from_count_update');
         campaignSocket.off('campaign_complete');
         
-        console.log('🔌 Campaign Socket.IO connected');
+        console.log('🔌 Campaign Socket.IO event handlers registered');
         
         campaignSocket.on('campaign_log', function(data) {
             console.log(`📝 Campaign Log [${data.type}]:`, data.message);
@@ -517,7 +498,8 @@ function initCampaignSocket() {
             // No need to reload - Socket.IO already updated counts in real-time
         });
     } else {
-        setTimeout(initCampaignSocket, 100);
+        console.warn('⚠️ window.socket not available - real-time campaign updates disabled');
+    }
     }
 }
 

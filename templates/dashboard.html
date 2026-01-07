@@ -114,56 +114,40 @@
 let socket;
 
 function initDashboardSocket() {
-    if (window.socket && window.socket.connected) {
-        console.log('✅ Dashboard using existing global Socket.IO connection');
+    // Use global socket from base.html (always available)
+    if (window.socket) {
+        console.log('✅ Dashboard using global Socket.IO connection');
         socket = window.socket;
-    } else if (typeof io !== 'undefined') {
-        console.log('🔌 Initializing Dashboard Socket.IO connection...');
-        socket = io({
-            transports: ['polling'],  // Use ONLY polling to prevent WebSocket crashes
-            reconnection: true,
-            reconnectionAttempts: 5,
-            timeout: 20000,
-            autoConnect: true
+        
+        // Register dashboard-specific event handlers
+        socket.on('campaign_log', function(data) {
+            addLog(data.message);
+        });
+
+        socket.on('campaign_stats', function(stats) {
+            updateStats(stats);
+        });
+
+        socket.on('campaign_stopped', function(stats) {
+            updateStats(stats);
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            showAlert('Campaign stopped successfully', 'warning');
+        });
+
+        socket.on('campaign_completed', function(stats) {
+            updateStats(stats);
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            showAlert('Campaign completed!', 'success');
+        });
+
+        socket.on('campaign_error', function(data) {
+            showAlert('Error: ' + data.error, 'danger');
         });
     } else {
-        console.warn('⚠️ Socket.IO not available on dashboard');
-        return;
+        console.warn('⚠️ window.socket not available on dashboard - real-time updates disabled');
     }
-
-    socket.on('connect', function() {
-        console.log('✅ Dashboard Socket.IO connected');
-    });
-
-    socket.on('connect_error', function(error) {
-        console.warn('⚠️ Dashboard Socket connection error:', error.message);
-    });
-
-    socket.on('campaign_log', function(data) {
-        addLog(data.message);
-    });
-
-    socket.on('campaign_stats', function(stats) {
-        updateStats(stats);
-    });
-
-    socket.on('campaign_stopped', function(stats) {
-        updateStats(stats);
-        document.getElementById('startBtn').disabled = false;
-        document.getElementById('stopBtn').disabled = true;
-        showAlert('Campaign stopped successfully', 'warning');
-    });
-
-    socket.on('campaign_completed', function(stats) {
-        updateStats(stats);
-        document.getElementById('startBtn').disabled = false;
-        document.getElementById('stopBtn').disabled = true;
-        showAlert('Campaign completed!', 'success');
-    });
-
-    socket.on('campaign_error', function(data) {
-        showAlert('Error: ' + data.error, 'danger');
-    });
 }
 
 function startCampaign() {
