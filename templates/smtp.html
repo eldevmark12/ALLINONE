@@ -3,6 +3,15 @@
 {% block title %}SMTP Management - ALL-in-One Email Portal{% endblock %}
 
 {% block content %}
+<!-- Loading Overlay -->
+<div id="pageLoadingOverlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); z-index: 9999; display: flex; justify-content: center; align-items: center; flex-direction: column;">
+    <div class="spinner-border text-white" role="status" style="width: 4rem; height: 4rem; border-width: 0.4rem;">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+    <h3 class="text-white mt-4">Loading SMTP Servers...</h3>
+    <p class="text-white-50">Please wait</p>
+</div>
+
 <div class="row">
     <div class="col-12 mb-4">
         <h1><i class="bi bi-server"></i> SMTP Management</h1>
@@ -215,6 +224,8 @@ let currentFilter = 'all';
 let isValidating = false; // Track validation state
 let socketInitAttempts = 0;
 const MAX_SOCKET_INIT_ATTEMPTS = 5;
+let pollingInterval = null; // For fallback polling when Socket.IO fails
+let socketConnected = false; // Track Socket.IO connection status
 
 // Initialize Socket.IO when available (with crash prevention)
 function initSocket() {
@@ -242,10 +253,28 @@ function initSocket() {
             
             socket.on('connect', function() {
                 console.log('✅ SMTP Socket.IO connected');
+                socketConnected = true;
+                stopPollingFallback(); // Stop polling if Socket.IO connects
             });
             
             socket.on('connect_error', function(error) {
                 console.warn('⚠️ SMTP Socket connection error:', error.message);
+                socketConnected = false;
+                // If validating and Socket.IO fails, start polling fallback
+                if (isValidating) {
+                    console.log('🔄 Socket.IO failed during validation - starting polling fallback');
+                    startPollingFallback();
+                }
+            });
+            
+            socket.on('disconnect', function() {
+                console.warn('⚠️ Socket.IO disconnected');
+                socketConnected = false;
+                // If validating and Socket.IO disconnects, start polling fallback
+                if (isValidating) {
+                    console.log('🔄 Socket.IO disconnected during validation - starting polling fallback');
+                    startPollingFallback();
+                }
             });
         }
         
@@ -275,6 +304,62 @@ function initSocket() {
 
 initSocket();
 
+// Polling fallback when Socket.IO fails
+function startPollingFallback() {
+    if (pollingInterval) return; // Already polling
+    
+    console.log('🔄 Starting polling fallback (checking every 2 seconds)');
+    pollingInterval = setInterval(() => {
+        if (!isValidating) {
+            stopPollingFallback();
+            return;
+        }
+        
+        // Poll validation status
+        fetch('/api/smtp/list')
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && data.servers) {
+                    // Calculate stats from server list
+                    const active = data.servers.filter(s => s.status === 'active').length;
+                    const inactive = data.servers.filter(s => s.status === 'inactive').length;
+                    const total = data.servers.length;
+                    const validated = active + inactive;
+                    const pending = total - validated;
+                    
+                    // Update UI with polled data
+                    updateValidationStats({
+                        validated: validated,
+                        failed: inactive,
+                        pending: pending,
+                        total: total
+                    });
+                    
+                    // Check if validation complete
+                    if (validated >= total && isValidating) {
+                        console.log('✅ Polling detected validation complete');
+                        addValidationLog('✅ Validation completed!');
+                        isValidating = false;
+                        document.getElementById('validatingCount').textContent = '0';
+                        stopPollingFallback();
+                        setTimeout(() => loadServers(), 1000);
+                    }
+                }
+            })
+            .catch(err => {
+                console.warn('⚠️ Polling error:', err.message);
+            });
+    }, 2000); // Poll every 2 seconds
+}
+
+function stopPollingFallback() {
+    if (pollingInterval) {
+        console.log('🛑 Stopping polling fallback');
+        clearInterval(pollingInterval);
+        pollingInterval = null;
+    }
+}
+
 function loadServers() {
     fetch('/api/smtp/list')
         .then(res => res.json())
@@ -283,10 +368,26 @@ function loadServers() {
                 servers = data.servers;
                 renderTable();
                 updateCounts();
+                
+                // Hide loading overlay after first successful load
+                const overlay = document.getElementById('pageLoadingOverlay');
+                if (overlay) {
+                    overlay.style.opacity = '0';
+                    overlay.style.transition = 'opacity 0.3s ease-out';
+                    setTimeout(() => overlay.remove(), 300);
+                }
             }
         })
         .catch(err => {
             showAlert('Error loading SMTP servers: ' + err.message, 'danger');
+            
+            // Hide overlay even on error to show the error message
+            const overlay = document.getElementById('pageLoadingOverlay');
+            if (overlay) {
+                overlay.style.opacity = '0';
+                overlay.style.transition = 'opacity 0.3s ease-out';
+                setTimeout(() => overlay.remove(), 300);
+            }
         });
 }
 
@@ -560,6 +661,13 @@ function validateServers(indices) {
         if (data.success) {
             addValidationLog(`✓ Validation started successfully for ${selectedServers.length} servers`);
             addValidationLog(`⏳ Testing SMTP connections and sending test emails...`);
+            
+            // If Socket.IO isn't connected, start polling fallback immediately
+            if (!socketConnected) {
+                console.log('⚠️ Socket.IO not connected - starting polling fallback');
+                addValidationLog('ℹ️ Using polling fallback (Socket.IO unavailable)');
+                setTimeout(() => startPollingFallback(), 1000); // Start after 1 second
+            }
         } else {
             showAlert('Error: ' + data.error, 'danger');
             isValidating = false; // Reset on error
