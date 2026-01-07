@@ -104,12 +104,12 @@ try {
             });
         }
         
-        socket.on('connect', function() {
+        window.socket.on('connect', function() {
             reconnectAttempts = 0; // Reset on successful connection
-            console.log('✅ Socket.IO connected (transport:', socket.io.engine.transport.name, ')');
+            console.log('✅ Socket.IO connected (transport:', window.socket.io.engine.transport.name, ')');
         });
         
-        socket.on('disconnect', function(reason) {
+        window.socket.on('disconnect', function(reason) {
             // Don't try to reconnect if we're intentionally disconnecting
             if (isIntentionalDisconnect) {
                 return;
@@ -122,7 +122,7 @@ try {
                 if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
                     console.log('🔄 Server disconnected - attempting reconnection...');
                     setTimeout(() => {
-                        socket.connect();
+                        window.socket.connect();
                     }, 5000); // Wait 5 seconds before reconnecting
                 } else {
                     console.warn('❌ Max reconnection attempts reached - stopping to prevent crash');
@@ -130,7 +130,7 @@ try {
             }
         });
         
-        socket.on('connect_error', function(error) {
+        window.socket.on('connect_error', function(error) {
             reconnectAttempts++;
             
             // Only log every 3rd error to reduce console spam
@@ -142,7 +142,7 @@ try {
             if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
                 console.error('❌ Max connection attempts reached - disconnecting to prevent system freeze');
                 isIntentionalDisconnect = true;
-                socket.disconnect();
+                window.socket.disconnect();
                 
                 // Show user-friendly message
                 const msg = document.createElement('div');
@@ -153,19 +153,19 @@ try {
             }
         });
         
-        socket.on('reconnect', function(attemptNumber) {
+        window.socket.on('reconnect', function(attemptNumber) {
             reconnectAttempts = 0; // Reset on successful reconnect
             console.log('🔄 Socket.IO reconnected after', attemptNumber, 'attempts');
         });
         
-        socket.on('reconnect_attempt', function(attemptNumber) {
+        window.socket.on('reconnect_attempt', function(attemptNumber) {
             // Only log every 5th attempt to reduce spam
             if (attemptNumber % 5 === 0) {
                 console.log('🔄 Reconnection attempt:', attemptNumber);
             }
         });
         
-        socket.on('reconnect_failed', function() {
+        window.socket.on('reconnect_failed', function() {
             console.error('❌ Socket.IO reconnection failed - giving up to prevent crash');
             isIntentionalDisconnect = true;
         });
@@ -176,8 +176,8 @@ try {
         // Handle page unload gracefully
         window.addEventListener('beforeunload', function() {
             isIntentionalDisconnect = true;
-            if (socket && socket.connected) {
-                socket.disconnect();
+            if (window.socket && window.socket.connected) {
+                window.socket.disconnect();
             }
         });
     } else {
