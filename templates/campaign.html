@@ -15,7 +15,9 @@
         <div class="card bg-primary text-white">
             <div class="card-body">
                 <h5 class="card-title"><i class="bi bi-envelope-fill"></i> From Emails</h5>
-                <h2 class="mb-0" id="fromCount">0</h2>
+                <h2 class="mb-0" id="fromCount">
+                    <span class="spinner-border spinner-border-sm" role="status"></span>
+                </h2>
             </div>
         </div>
     </div>
@@ -23,7 +25,9 @@
         <div class="card bg-info text-white">
             <div class="card-body">
                 <h5 class="card-title"><i class="bi bi-people-fill"></i> Recipients</h5>
-                <h2 class="mb-0" id="recipientCount">0</h2>
+                <h2 class="mb-0" id="recipientCount">
+                    <span class="spinner-border spinner-border-sm" role="status"></span>
+                </h2>
             </div>
         </div>
     </div>
@@ -427,6 +431,15 @@
     </div>
 </div>
 
+<!-- Page Loading Overlay -->
+<div id="pageLoadingOverlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, rgba(52, 152, 219, 0.95) 0%, rgba(41, 128, 185, 0.95) 100%); z-index: 9999; display: flex; justify-content: center; align-items: center;">
+    <div style="text-align: center; color: white;">
+        <div class="spinner-border mb-3" style="width: 4rem; height: 4rem; border-width: 0.3rem;" role="status"></div>
+        <h3>Loading Campaign Manager...</h3>
+        <p class="mb-0">Fetching configuration and statistics</p>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -511,6 +524,13 @@ function initCampaignSocket() {
 // Load configuration
 function loadConfig() {
     console.log('⚙️ Loading configuration...');
+    
+    // Show loading state in form
+    const loadingMsg = document.getElementById('alertContainer');
+    if (loadingMsg) {
+        loadingMsg.innerHTML = `<div class="alert alert-info"><span class="spinner-border spinner-border-sm me-2"></span>Loading configuration...</div>`;
+    }
+    
     fetch('/api/config/get')
         .then(res => res.json())
         .then(data => {
@@ -541,6 +561,10 @@ function loadConfig() {
                 document.getElementById('domainauth').value = config.DOMAIN_AUTHENTICATION || config.domain_authentication || '';
                 document.getElementById('sleeptime').value = config.SLEEPTIME || config.sleeptime || '1';
                 document.getElementById('threads').value = config.threads || '10';
+                
+                // Clear loading message
+                const loadingMsg = document.getElementById('alertContainer');
+                if (loadingMsg) loadingMsg.innerHTML = '';
                 
                 console.log('📝 Form populated with configuration');
             } else {
@@ -630,9 +654,13 @@ function loadFromEmails(forceRefresh = false) {
     if (!forceRefresh && fromEmailsCache !== null && (now - fromEmailsCacheTime < CACHE_DURATION)) {
         console.log('✅ Using cached from emails count:', fromEmailsCache);
         document.getElementById('fromCount').textContent = fromEmailsCache;
-        document.getElementById('fromCountLarge').textContent = fromEmailsCache.toLocaleString();
+        const largeCt = document.getElementById('fromCountLarge');
+        if (largeCt) largeCt.textContent = fromEmailsCache.toLocaleString();
         return;
     }
+    
+    // Show loading spinner
+    document.getElementById('fromCount').innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
     
     // Add cache-busting parameter to force fresh data
     const cacheBuster = `?t=${Date.now()}`;
@@ -644,9 +672,11 @@ function loadFromEmails(forceRefresh = false) {
                 fromEmailsCache = data.count;
                 fromEmailsCacheTime = Date.now();
                 document.getElementById('fromCount').textContent = data.count;
-                document.getElementById('fromCountLarge').textContent = data.count.toLocaleString();
+                const largeCt = document.getElementById('fromCountLarge');
+                if (largeCt) largeCt.textContent = data.count.toLocaleString();
             } else {
                 console.error('❌ Failed to load from emails:', data);
+                document.getElementById('fromCount').textContent = '0';
             }
         })
         .catch(err => console.error('❌ Error loading from emails:', err));
@@ -664,9 +694,13 @@ function loadRecipients(forceRefresh = false) {
     if (!forceRefresh && recipientsCache !== null && (now - recipientsCacheTime < CACHE_DURATION)) {
         console.log('✅ Using cached recipients count:', recipientsCache);
         document.getElementById('recipientCount').textContent = recipientsCache;
-        document.getElementById('recipientCountLarge').textContent = recipientsCache.toLocaleString();
+        const largeCt = document.getElementById('recipientCountLarge');
+        if (largeCt) largeCt.textContent = recipientsCache.toLocaleString();
         return;
     }
+    
+    // Show loading spinner
+    document.getElementById('recipientCount').innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
     
     fetch('/api/campaign/recipients/list')
         .then(res => res.json())
@@ -676,9 +710,11 @@ function loadRecipients(forceRefresh = false) {
                 recipientsCache = data.count;
                 recipientsCacheTime = Date.now();
                 document.getElementById('recipientCount').textContent = data.count;
-                document.getElementById('recipientCountLarge').textContent = data.count.toLocaleString();
+                const largeCt = document.getElementById('recipientCountLarge');
+                if (largeCt) largeCt.textContent = data.count.toLocaleString();
             } else {
                 console.error('❌ Failed to load recipients:', data);
+                document.getElementById('recipientCount').textContent = '0';
             }
         })
         .catch(err => console.error('❌ Error loading recipients:', err));
@@ -1250,14 +1286,28 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize socket first
     initCampaignSocket();
     
-    // Stagger API calls to prevent overwhelming the server
-    setTimeout(() => loadConfig(), 100);
-    setTimeout(() => loadFromEmails(), 300);
-    setTimeout(() => loadRecipients(), 500);
-    setTimeout(() => checkCampaignStatus(), 700);
-    
-    console.log('✅ Campaign page initialization complete');
-    console.log('📡 Socket.IO handles real-time updates - no polling needed');
+    // Load all data in parallel for faster page load
+    Promise.all([
+        new Promise(resolve => { loadConfig(); setTimeout(resolve, 100); }),
+        new Promise(resolve => { loadFromEmails(); setTimeout(resolve, 100); }),
+        new Promise(resolve => { loadRecipients(); setTimeout(resolve, 100); }),
+        new Promise(resolve => { checkCampaignStatus(); setTimeout(resolve, 100); })
+    ]).then(() => {
+        // Hide loading overlay after all data loaded
+        const overlay = document.getElementById('pageLoadingOverlay');
+        if (overlay) {
+            overlay.style.opacity = '0';
+            overlay.style.transition = 'opacity 0.3s';
+            setTimeout(() => overlay.remove(), 300);
+        }
+        console.log('✅ Campaign page initialization complete');
+        console.log('📡 Socket.IO handles real-time updates - no polling needed');
+    }).catch(err => {
+        console.error('❌ Initialization error:', err);
+        // Hide overlay even on error
+        const overlay = document.getElementById('pageLoadingOverlay');
+        if (overlay) overlay.remove();
+    });
     
     // Socket.IO handles real-time count updates during campaign
     // No polling needed - Socket.IO 'from_count_update' event updates counts automatically
