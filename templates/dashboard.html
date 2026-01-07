@@ -151,19 +151,20 @@ function initDashboardSocket() {
         updateStats(stats);
         document.getElementById('startBtn').disabled = false;
         document.getElementById('stopBtn').disabled = true;
-    showAlert('Campaign stopped successfully', 'warning');
-});
+        showAlert('Campaign stopped successfully', 'warning');
+    });
 
-socket.on('campaign_completed', function(stats) {
-    updateStats(stats);
-    document.getElementById('startBtn').disabled = false;
-    document.getElementById('stopBtn').disabled = true;
-    showAlert('Campaign completed!', 'success');
-});
+    socket.on('campaign_completed', function(stats) {
+        updateStats(stats);
+        document.getElementById('startBtn').disabled = false;
+        document.getElementById('stopBtn').disabled = true;
+        showAlert('Campaign completed!', 'success');
+    });
 
-socket.on('campaign_error', function(data) {
-    showAlert('Error: ' + data.error, 'danger');
-});
+    socket.on('campaign_error', function(data) {
+        showAlert('Error: ' + data.error, 'danger');
+    });
+}
 
 function startCampaign() {
     fetch('/api/campaign/start', {
