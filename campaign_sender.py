@@ -128,6 +128,16 @@ class CampaignSender:
     def send_email(self, recipient, from_email, smtp_server, html_content, subject, sender_name):
         """Send single email via SMTP"""
         try:
+            # Replace random placeholders in subject and body
+            random5 = ''.join(random.choices(string.ascii_letters + string.digits, k=5))
+            random_ref = ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
+            
+            # Replace in subject: <randomchar5> → 5 random chars
+            personalized_subject = subject.replace('<randomchar5>', random5)
+            
+            # Replace in body: RANDOM → 10 random chars
+            personalized_html = html_content.replace('RANDOM', random_ref)
+            
             # Create message
             msg = MIMEMultipart("alternative")
             msg.set_boundary(self.generate_random_boundary())
@@ -136,7 +146,7 @@ class CampaignSender:
             msg['From'] = f'{sender_name} <{from_email}>'
             msg['To'] = recipient
             msg['Date'] = email.utils.formatdate(localtime=True)
-            msg['Subject'] = subject
+            msg['Subject'] = personalized_subject
             msg["Message-ID"] = f"<{str(uuid.uuid4())}@mta-{random.randint(1000, 9999)}.i>"
             
             # Check importance setting
@@ -145,7 +155,7 @@ class CampaignSender:
                 msg['X-Priority'] = "1"
             
             # Attach HTML content
-            message_html_cleaned = ''.join(char if 32 <= ord(char) < 128 else ' ' for char in html_content)
+            message_html_cleaned = ''.join(char if 32 <= ord(char) < 128 else ' ' for char in personalized_html)
             letterx = MIMEText(message_html_cleaned, "html")
             msg.attach(letterx)
             
@@ -209,42 +219,92 @@ class CampaignSender:
             return False
     
     def send_campaign(self, recipients, from_emails, smtp_servers, html_content, subject, sender_name):
-        """Send campaign to all from emails by cycling through recipients"""
+        """Send campaign to all from emails by cycling through recipients with multi-threading"""
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        
         self.running = True
         self.total_sent = 0
         self.total_failed = 0
         self.smtp_stats = {}
         self.used_from_emails = set()
         
+        # Get thread count from config (default 8)
+        thread_count = int(self.config.get('threads', 8))
+        
         self.log(f"Starting campaign: {len(recipients)} recipients, {len(from_emails)} from emails, {len([s for s in smtp_servers if s.get('status') == 'active'])} active SMTPs", 'info')
+        self.log(f"📮 Using {thread_count} threads for parallel sending", 'info')
         self.log(f"Will cycle through {len(recipients)} recipients until all {len(from_emails)} from emails are used", 'info')
         
-        # Keep sending until all from emails are used
-        while len(self.used_from_emails) < len(from_emails) and self.running:
-            for recipient in recipients:
+        # Create task list: pair each from_email with a recipient
+        tasks = []
+        recipient_index = 0
+        for from_email in from_emails:
+            if not self.running:
+                break
+            recipient = recipients[recipient_index % len(recipients)]
+            recipient_index += 1
+            tasks.append((from_email, recipient))
+        
+        self.log(f"📋 Created {len(tasks)} sending tasks", 'info')
+        
+        # Execute tasks with thread pool
+        with ThreadPoolExecutor(max_workers=thread_count) as executor:
+            futures = {}
+            
+            for from_email, recipient in tasks:
                 if not self.running:
-                    self.log("Campaign stopped by user", 'warning')
                     break
                 
-                # Check if all from emails have been used
-                if len(self.used_from_emails) >= len(from_emails):
-                    self.log("All from emails have been used", 'success')
-                    break
-                
-                # Get next from email (round-robin across all from emails)
-                from_email = self.get_next_from_email(from_emails)
-                if not from_email:
-                    self.log("No from emails available", 'error')
-                    break
-                
-                # Get next SMTP (round-robin across recipients, skip disabled)
+                # Get next SMTP (round-robin, skip disabled)
                 smtp_server = self.get_next_smtp(smtp_servers)
                 if not smtp_server:
                     self.log("No active SMTP servers available (all may be disabled)", 'error')
                     break
                 
-                # Send email
-                self.send_email(recipient, from_email, smtp_server, html_content, subject, sender_name)
+                # Submit task
+                future = executor.submit(
+                    self.send_email, 
+                    recipient, 
+                    from_email, 
+                    smtp_server, 
+                    html_content, 
+                    subject, 
+                    sender_name
+                )
+                futures[future] = (from_email, recipient, smtp_server)
+            
+            # Process completed tasks
+            for future in as_completed(futures):
+                if not self.running:
+                    self.log("⚠️ Campaign stopped by user", 'warning')
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    break
+                
+                from_email, recipient, smtp_server = futures[future]
+                
+                try:
+                    success = future.result()
+                    
+                    # Track from email usage
+                    if from_email not in self.used_from_emails:
+                        self.used_from_emails.add(from_email)
+                        
+                        # Remove from email from file
+                        if self.from_file_path:
+                            self.remove_from_email_from_file(from_email)
+                        
+                        # Notify about from email count change
+                        if self.callback:
+                            remaining = len(from_emails) - len(self.used_from_emails)
+                            self.callback({
+                                'type': 'from_count_update',
+                                'total': len(from_emails),
+                                'used': len(self.used_from_emails),
+                                'remaining': remaining
+                            })
+                
+                except Exception as e:
+                    self.log(f"✗ Task failed: {str(e)[:100]}", 'error')
         
         # Log final SMTP statistics
         if self.disabled_smtps:
