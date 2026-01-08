@@ -1695,7 +1695,7 @@ def save_recheck_configuration():
     """Save recheck configuration"""
     try:
         config = request.json
-        thread_count = config.get('threads', 3)
+        thread_count = config.get('threads', 8)
         print(f"💾 Saving recheck config with {thread_count} threads")
         if save_recheck_config(config):
             return jsonify({'success': True, 'threads_saved': thread_count})
@@ -1713,7 +1713,7 @@ def get_recheck_configuration():
             # Return default config with test recipients
             config = {
                 'from_source': 'active',
-                'threads': 3,
+                'threads': 8,
                 'sender_name': 'Verification System',
                 'subject': 'Verification {unique_id}',
                 'recipients': [
@@ -2286,8 +2286,8 @@ def run_recheck_campaign():
             smtp_name = smtp.get('username', smtp['host']).split('@')[0]
             emit_log(f'   SMTP #{i}: {smtp["host"]} ({smtp_name})', 'info')
         
-        # Get thread count from config (default 3)
-        thread_count = config.get('threads', 3)
+        # Get thread count from config (default 8)
+        thread_count = config.get('threads', 8)
         emit_log(f'📮 Using {len(smtp_servers)} SMTP servers with {thread_count} threads', 'info')
         
         # Send test emails using ThreadPoolExecutor
