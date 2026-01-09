@@ -32,13 +32,13 @@ class CampaignSender:
         self.from_file_path = from_file_path
         self.smtp_file_path = os.path.join('Basic', 'smtp.txt')
         self.used_from_emails = set()  # Track used from emails
-        self.max_smtp_failures = 10  # Disable SMTP after 10 consecutive failures
+        self.max_smtp_failures = 5  # Mark SMTP as inactive after 5 consecutive failures
         
-        # Load previously disabled SMTPs from smtp.txt on init
+        # Load previously disabled/inactive SMTPs from smtp.txt on init
         self._load_disabled_smtps()
     
     def _load_disabled_smtps(self):
-        """Load previously disabled SMTPs from smtp.txt file"""
+        """Load previously disabled/inactive SMTPs from smtp.txt file"""
         try:
             if not os.path.exists(self.smtp_file_path):
                 return
@@ -51,9 +51,9 @@ class CampaignSender:
                         if len(parts) >= 5:
                             username = parts[2].strip()
                             status = parts[4].strip()
-                            if status == 'disabled':
+                            if status in ['disabled', 'inactive']:
                                 self.disabled_smtps.add(username)
-                                self.log(f"🔄 Loaded previously disabled SMTP: {username}", 'warning')
+                                self.log(f"🔄 Loaded previously {status} SMTP: {username}", 'warning')
         except Exception as e:
             self.log(f"⚠️ Error loading disabled SMTPs: {str(e)}", 'warning')
     
@@ -161,10 +161,10 @@ class CampaignSender:
         the queue with available SMTPs. The queue will be consumed as threads
         pick up SMTPs for sending.
         """
-        # Filter active SMTPs that are not disabled
+        # Filter ONLY active SMTPs that are not in disabled set
         active_smtps = [
             s for s in smtp_servers 
-            if s.get('status') in ['active', 'inactive'] and s['username'] not in self.disabled_smtps
+            if s.get('status') == 'active' and s['username'] not in self.disabled_smtps
         ]
         
         self.log(f"📊 SMTP Status: Total={len(smtp_servers)}, Disabled={len(self.disabled_smtps)}, Available={len(active_smtps)}", 'info')
@@ -194,12 +194,12 @@ class CampaignSender:
             self.smtp_stats[smtp_username] = self.smtp_stats.get(smtp_username, 0) + 1
     
     def increment_smtp_failure(self, smtp_username):
-        """Increment failure counter for SMTP and disable if threshold reached
+        """Increment failure counter for SMTP and mark as inactive if threshold reached
         
         When an SMTP reaches the failure threshold:
         1. Add to in-memory disabled set
-        2. Update status to 'disabled' in smtp.txt file
-        3. Log the disabling event
+        2. Update status to 'inactive' in smtp.txt file
+        3. Log the marking event
         """
         with self.smtp_lock:
             self.smtp_failures[smtp_username] = self.smtp_failures.get(smtp_username, 0) + 1
@@ -208,13 +208,13 @@ class CampaignSender:
                 # Add to disabled set (in-memory)
                 self.disabled_smtps.add(smtp_username)
                 
-                # Persist to smtp.txt file immediately
-                success = self._update_smtp_status_in_file(smtp_username, 'disabled')
+                # Persist to smtp.txt file immediately (mark as 'inactive')
+                success = self._update_smtp_status_in_file(smtp_username, 'inactive')
                 
                 if success:
-                    self.log(f"⚠️ SMTP {smtp_username} DISABLED after {self.smtp_failures[smtp_username]} failures (persisted to file)", 'warning')
+                    self.log(f"⚠️ SMTP {smtp_username} marked INACTIVE after {self.smtp_failures[smtp_username]} failures (persisted to file)", 'warning')
                 else:
-                    self.log(f"⚠️ SMTP {smtp_username} DISABLED after {self.smtp_failures[smtp_username]} failures (file update failed)", 'warning')
+                    self.log(f"⚠️ SMTP {smtp_username} marked INACTIVE after {self.smtp_failures[smtp_username]} failures (file update failed)", 'warning')
                 
                 return True
         return False
@@ -340,7 +340,7 @@ class CampaignSender:
         # Initialize SMTP queue for thread-safe distribution
         self._initialize_smtp_queue(smtp_servers)
         
-        active_smtp_count = len([s for s in smtp_servers if s.get('status') in ['active', 'inactive'] and s['username'] not in self.disabled_smtps])
+        active_smtp_count = len([s for s in smtp_servers if s.get('status') == 'active' and s['username'] not in self.disabled_smtps])
         
         self.log(f"🚀 Starting campaign: {len(recipients)} recipients, {len(from_emails)} from emails", 'info')
         self.log(f"📊 SMTPs: {active_smtp_count} available, {len(self.disabled_smtps)} disabled", 'info')
@@ -370,17 +370,18 @@ class CampaignSender:
                 # Get next SMTP from queue (thread-safe)
                 smtp_server = self.get_next_smtp()
                 if not smtp_server:
-                    self.log("⚠️ No SMTP servers available in queue (all may be used or disabled)", 'warning')
-                    # Try to refill queue with remaining active SMTPs
-                    remaining_smtps = [s for s in smtp_servers if s.get('status') in ['active', 'inactive'] and s['username'] not in self.disabled_smtps]
+                    self.log("⚠️ No SMTP servers available in queue", 'warning')
+                    # Try to refill queue with remaining ACTIVE SMTPs only
+                    remaining_smtps = [s for s in smtp_servers if s.get('status') == 'active' and s['username'] not in self.disabled_smtps]
                     if remaining_smtps:
-                        self.log(f"🔄 Refilling SMTP queue with {len(remaining_smtps)} remaining SMTPs", 'info')
+                        self.log(f"🔄 Refilling SMTP queue with {len(remaining_smtps)} active SMTPs", 'info')
                         for smtp in remaining_smtps * 10:  # Add each SMTP 10 times
                             self.smtp_queue.put(smtp)
                         smtp_server = self.get_next_smtp()
                     
                     if not smtp_server:
-                        self.log("❌ No active SMTP servers available - stopping campaign", 'error')
+                        self.log("❌ No active SMTP servers available - STOPPING CAMPAIGN", 'error')
+                        self.running = False
                         break
                 
                 # Submit task

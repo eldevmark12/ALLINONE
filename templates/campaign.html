@@ -277,8 +277,24 @@
                             </div>
                         </div>
                         
+                        <!-- Filter Buttons -->
+                        <div class="btn-group mb-2" role="group">
+                            <button type="button" class="btn btn-sm btn-outline-primary active" onclick="filterLogs('all')" id="filterAll">
+                                All Logs
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-success" onclick="filterLogs('success')" id="filterSuccess">
+                                ✓ Success Only
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="filterLogs('error')" id="filterError">
+                                ✗ Errors Only
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-warning" onclick="filterLogs('warning')" id="filterWarning">
+                                ⚠ Warnings
+                            </button>
+                        </div>
+                        
                         <div id="consoleOutput" style="background-color: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 5px; height: 600px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 12px;">
-                            <div class="text-success">Console ready. Click "Start Campaign" to begin sending...</div>
+                            <div class="text-success console-log log-info" data-type="info">Console ready. Click "Start Campaign" to begin sending...</div>
                         </div>
                     </div>
                 </div>
@@ -1182,7 +1198,9 @@ function stopCampaign() {
         });
 }
 
-// Add console log
+// Add console log with filtering support
+let currentFilter = 'all'; // Track current filter
+
 function addConsoleLog(message, type = 'info') {
     const console = document.getElementById('consoleOutput');
     const time = new Date().toLocaleTimeString();
@@ -1195,13 +1213,52 @@ function addConsoleLog(message, type = 'info') {
     const log = document.createElement('div');
     log.style.color = color;
     log.textContent = `[${time}] ${message}`;
+    log.className = `console-log log-${type}`; // Add class for filtering
+    log.setAttribute('data-type', type); // Store log type
+    
+    // Apply current filter
+    if (currentFilter !== 'all' && type !== currentFilter) {
+        log.style.display = 'none';
+    }
+    
     console.appendChild(log);
+    console.scrollTop = console.scrollHeight;
+}
+
+// Filter console logs
+function filterLogs(type) {
+    currentFilter = type;
+    const logs = document.querySelectorAll('.console-log');
+    
+    // Update button states
+    document.querySelectorAll('.btn-group button').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.getElementById('filter' + type.charAt(0).toUpperCase() + type.slice(1)).classList.add('active');
+    
+    // Show/hide logs based on filter
+    logs.forEach(log => {
+        const logType = log.getAttribute('data-type');
+        if (type === 'all' || logType === type) {
+            log.style.display = '';
+        } else {
+            log.style.display = 'none';
+        }
+    });
+    
+    // Scroll to bottom
+    const console = document.getElementById('consoleOutput');
     console.scrollTop = console.scrollHeight;
 }
 
 // Clear console
 function clearConsole() {
-    document.getElementById('consoleOutput').innerHTML = '<div class="text-success">Console cleared.</div>';
+    document.getElementById('consoleOutput').innerHTML = '<div class="text-success console-log log-info" data-type="info">Console cleared.</div>';
+    currentFilter = 'all'; // Reset filter
+    document.querySelectorAll('.btn-group button').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.getElementById('filterAll').classList.add('active');
 }
 
 // Update stats
