@@ -649,7 +649,30 @@ copermerv2026@yahoo.com</textarea>
                 <!-- Activity Log -->
                 <div class="row">
                     <div class="col-md-8">
-                        <h6><i class="bi bi-list-ul"></i> Latest Activity</h6>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0"><i class="bi bi-list-ul"></i> Latest Activity</h6>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <input type="radio" class="btn-check" name="recheckLogFilter" id="recheckFilterAll" autocomplete="off" checked>
+                                <label class="btn btn-outline-secondary" for="recheckFilterAll" onclick="filterRecheckLog('all')">
+                                    <i class="bi bi-list"></i> All
+                                </label>
+                                
+                                <input type="radio" class="btn-check" name="recheckLogFilter" id="recheckFilterSuccess" autocomplete="off">
+                                <label class="btn btn-outline-success" for="recheckFilterSuccess" onclick="filterRecheckLog('success')">
+                                    <i class="bi bi-check-circle"></i> Success
+                                </label>
+                                
+                                <input type="radio" class="btn-check" name="recheckLogFilter" id="recheckFilterError" autocomplete="off">
+                                <label class="btn btn-outline-danger" for="recheckFilterError" onclick="filterRecheckLog('error')">
+                                    <i class="bi bi-x-circle"></i> Error
+                                </label>
+                                
+                                <input type="radio" class="btn-check" name="recheckLogFilter" id="recheckFilterWarning" autocomplete="off">
+                                <label class="btn btn-outline-warning" for="recheckFilterWarning" onclick="filterRecheckLog('warning')">
+                                    <i class="bi bi-exclamation-triangle"></i> Warning
+                                </label>
+                            </div>
+                        </div>
                         <div id="recheckActivityLog" 
                              style="height: 200px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 12px;">
                             <div class="text-muted">Initializing...</div>
@@ -2529,6 +2552,23 @@ function addRecheckActivity(message, type = 'info') {
     const entry = document.createElement('div');
     entry.className = `text-${type === 'error' ? 'danger' : type === 'warning' ? 'warning' : type === 'success' ? 'success' : 'secondary'}`;
     entry.textContent = `[${timestamp}] ${icons[type]} ${message}`;
+    entry.setAttribute('data-log-type', type);
+    
+    // Apply current filter
+    if (currentRecheckLogFilter !== 'all') {
+        const icon = icons[type];
+        switch(currentRecheckLogFilter) {
+            case 'success':
+                entry.style.display = icon === '✅' ? '' : 'none';
+                break;
+            case 'error':
+                entry.style.display = icon === '❌' ? '' : 'none';
+                break;
+            case 'warning':
+                entry.style.display = icon === '⚠️' ? '' : 'none';
+                break;
+        }
+    }
     
     log.insertBefore(entry, log.firstChild);
     
@@ -2936,6 +2976,58 @@ if (typeof socket !== 'undefined') {
         }
     });
 }
+
+// Global variable to track current log filter
+let currentRecheckLogFilter = 'all';
+
+// Filter recheck activity log
+function filterRecheckLog(filterType) {
+    currentRecheckLogFilter = filterType;
+    const log = document.getElementById('recheckActivityLog');
+    const entries = log.children;
+    
+    for (let entry of entries) {
+        const text = entry.textContent;
+        
+        switch(filterType) {
+            case 'all':
+                entry.style.display = '';
+                break;
+            case 'success':
+                entry.style.display = text.includes('✅') ? '' : 'none';
+                break;
+            case 'error':
+                entry.style.display = text.includes('❌') ? '' : 'none';
+                break;
+            case 'warning':
+                entry.style.display = text.includes('⚠️') ? '' : 'none';
+                break;
+        }
+    }
+}
+
+// Update active from count in navigation badge
+function updateActiveFromNavBadge() {
+    fetch('/api/sending/from_stats')
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                const badge = document.getElementById('activeFromsNavBadge');
+                if (badge && data.active_count > 0) {
+                    badge.textContent = data.active_count;
+                    badge.style.display = 'inline';
+                }
+            }
+        })
+        .catch(err => console.error('Error fetching active from count:', err));
+}
+
+// Call on page load
+document.addEventListener('DOMContentLoaded', function() {
+    updateActiveFromNavBadge();
+    // Refresh every 30 seconds
+    setInterval(updateActiveFromNavBadge, 30000);
+});
 
 </script>
 {% endblock %}
