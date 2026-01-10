@@ -2925,13 +2925,16 @@ if (typeof socket !== 'undefined') {
     });
     
     socket.on('recheck_progress', function(data) {
-        // Update progress bar only (Phase 1: Sending)
+        // Update progress bar (Phase 1: Sending)
         const percent = (data.sent / data.total * 100).toFixed(0);
         document.getElementById('recheckSendingProgress').style.width = percent + '%';
         document.getElementById('recheckSendingText').textContent = `${data.sent}/${data.total} (${percent}%)`;
         
-        // Note: Pending count is updated by recheck_response_detected (Phase 2: Responses)
-        // Don't update here as it would overwrite actual response counts
+        // Update pending count: During Phase 1, pending = total - sent
+        // (This will be overridden by recheck_response_detected in Phase 2)
+        const pendingCount = data.total - data.sent;
+        document.getElementById('recheckPendingCount').textContent = pendingCount;
+        console.log(`📤 Progress: ${data.sent}/${data.total}, Pending: ${pendingCount}`);
     });
     
     socket.on('recheck_log', function(data) {
@@ -2982,28 +2985,36 @@ let currentRecheckLogFilter = 'all';
 
 // Filter recheck activity log
 function filterRecheckLog(filterType) {
+    console.log('🔍 Filtering logs:', filterType);
     currentRecheckLogFilter = filterType;
     const log = document.getElementById('recheckActivityLog');
     const entries = log.children;
     
+    let visibleCount = 0;
     for (let entry of entries) {
-        const text = entry.textContent;
+        const logType = entry.getAttribute('data-log-type') || 'info';
+        let shouldShow = false;
         
         switch(filterType) {
             case 'all':
-                entry.style.display = '';
+                shouldShow = true;
                 break;
             case 'success':
-                entry.style.display = text.includes('✅') ? '' : 'none';
+                shouldShow = (logType === 'success');
                 break;
             case 'error':
-                entry.style.display = text.includes('❌') ? '' : 'none';
+                shouldShow = (logType === 'error');
                 break;
             case 'warning':
-                entry.style.display = text.includes('⚠️') ? '' : 'none';
+                shouldShow = (logType === 'warning');
                 break;
         }
+        
+        entry.style.display = shouldShow ? '' : 'none';
+        if (shouldShow) visibleCount++;
     }
+    
+    console.log(`✅ Filter applied: ${visibleCount} entries visible`);
 }
 
 // Update active from count in navigation badge
