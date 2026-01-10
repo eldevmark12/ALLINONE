@@ -531,9 +531,25 @@ function initCampaignSocket() {
         
         campaignSocket.on('from_count_update', function(data) {
             // Update from email count in real-time as emails are used
-            console.log(`📧 From count updated: ${data.remaining} remaining`);
-            document.getElementById('fromCount').textContent = data.remaining;
-            document.getElementById('fromCountLarge').textContent = data.remaining.toLocaleString();
+            console.log(`📧 From count updated: ${data.remaining} remaining (${data.used} used)`);
+            
+            const fromCountEl = document.getElementById('fromCount');
+            const fromCountLargeEl = document.getElementById('fromCountLarge');
+            
+            // Update both counters
+            fromCountEl.textContent = data.remaining;
+            fromCountLargeEl.textContent = data.remaining.toLocaleString();
+            
+            // Add visual feedback - flash animation when count changes
+            [fromCountEl, fromCountLargeEl].forEach(el => {
+                el.style.transition = 'all 0.3s';
+                el.style.transform = 'scale(1.1)';
+                el.style.color = '#ffc107';  // Yellow flash
+                setTimeout(() => {
+                    el.style.transform = 'scale(1)';
+                    el.style.color = '';
+                }, 300);
+            });
         });
         
         campaignSocket.on('campaign_complete', function(data) {

@@ -519,13 +519,13 @@ class CampaignSender:
                     if from_email not in self.used_from_emails:
                         self.used_from_emails.add(from_email)
                         
-                        # Remove from email from file
+                        # Remove from email from file immediately
                         if self.from_file_path:
                             self.remove_from_email_from_file(from_email)
                         
-                        # Notify about from email count change
+                        # Notify about from email count change (real-time update)
+                        remaining = len(from_emails) - len(self.used_from_emails)
                         if self.callback:
-                            remaining = len(from_emails) - len(self.used_from_emails)
                             self.callback({
                                 'type': 'from_count_update',
                                 'total': len(from_emails),
