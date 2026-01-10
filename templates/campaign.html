@@ -277,6 +277,32 @@
                             </div>
                         </div>
                         
+                        <!-- SMTP Status Counters -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <div class="alert alert-success mb-0 d-flex align-items-center" style="padding: 0.5rem 1rem;">
+                                    <i class="bi bi-check-circle-fill me-2"></i>
+                                    <div>
+                                        <strong>Active SMTPs:</strong> 
+                                        <span id="activeSMTPCount" class="badge bg-success ms-1">
+                                            <span class="spinner-border spinner-border-sm" role="status"></span>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="alert alert-danger mb-0 d-flex align-items-center" style="padding: 0.5rem 1rem;">
+                                    <i class="bi bi-x-circle-fill me-2"></i>
+                                    <div>
+                                        <strong>Inactive/Disabled SMTPs:</strong> 
+                                        <span id="inactiveSMTPCount" class="badge bg-danger ms-1">
+                                            <span class="spinner-border spinner-border-sm" role="status"></span>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <!-- Filter Buttons -->
                         <div class="btn-group mb-2" role="group">
                             <button type="button" class="btn btn-sm btn-outline-primary active" onclick="filterLogs('all')" id="filterAll">
@@ -484,6 +510,7 @@ function initCampaignSocket() {
         campaignSocket.off('campaign_stats');
         campaignSocket.off('from_count_update');
         campaignSocket.off('campaign_complete');
+        campaignSocket.off('smtp_status_update');
         
         console.log('🔌 Campaign Socket.IO event handlers registered');
         
@@ -495,6 +522,11 @@ function initCampaignSocket() {
         campaignSocket.on('campaign_stats', function(data) {
             console.log('📊 Campaign Stats:', data);
             updateStats(data);
+        });
+        
+        campaignSocket.on('smtp_status_update', function(data) {
+            console.log('📡 SMTP Status Update:', data);
+            updateSMTPStatus(data);
         });
         
         campaignSocket.on('from_count_update', function(data) {
@@ -1267,6 +1299,37 @@ function updateStats(stats) {
     if (stats.failed !== undefined) document.getElementById('failedCount').textContent = stats.failed;
 }
 
+// Update SMTP status counters
+function updateSMTPStatus(data) {
+    const activeCount = data.active || 0;
+    const inactiveCount = data.inactive || 0;
+    
+    document.getElementById('activeSMTPCount').textContent = activeCount;
+    document.getElementById('inactiveSMTPCount').textContent = inactiveCount;
+    
+    console.log(`📊 SMTP Status: ${activeCount} active, ${inactiveCount} inactive`);
+}
+
+// Fetch initial SMTP counts
+function fetchSMTPCounts() {
+    fetch('/api/smtp/status')
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                updateSMTPStatus({
+                    active: data.active_count,
+                    inactive: data.inactive_count
+                });
+            }
+        })
+        .catch(err => {
+            console.error('Error fetching SMTP counts:', err);
+            // Show 0 if error
+            document.getElementById('activeSMTPCount').textContent = '0';
+            document.getElementById('inactiveSMTPCount').textContent = '0';
+        });
+}
+
 // Show alert
 function showAlert(message, type) {
     const alert = document.createElement('div');
@@ -1329,7 +1392,8 @@ document.addEventListener('DOMContentLoaded', function() {
         new Promise(resolve => { loadConfig(); setTimeout(resolve, 100); }),
         new Promise(resolve => { loadFromEmails(); setTimeout(resolve, 100); }),
         new Promise(resolve => { loadRecipients(); setTimeout(resolve, 100); }),
-        new Promise(resolve => { checkCampaignStatus(); setTimeout(resolve, 100); })
+        new Promise(resolve => { checkCampaignStatus(); setTimeout(resolve, 100); }),
+        new Promise(resolve => { fetchSMTPCounts(); setTimeout(resolve, 100); })
     ]).then(() => {
         // Hide loading overlay after all data loaded
         const overlay = document.getElementById('pageLoadingOverlay');

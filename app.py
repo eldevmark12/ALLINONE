@@ -948,6 +948,36 @@ def get_campaign_status():
         'stats': campaign_stats
     })
 
+@app.route('/api/smtp/status', methods=['GET'])
+@login_required
+def get_smtp_status():
+    """Get SMTP status counts (active/inactive)"""
+    try:
+        smtp_file_path = os.path.join('Basic', 'smtp.txt')
+        active_count = 0
+        inactive_count = 0
+        
+        if os.path.exists(smtp_file_path):
+            with open(smtp_file_path, 'r') as f:
+                lines = f.readlines()[1:]  # Skip header
+                for line in lines:
+                    if line.strip():
+                        parts = line.strip().split(',')
+                        if len(parts) >= 5:
+                            status = parts[4].strip()
+                            if status == 'active':
+                                active_count += 1
+                            elif status in ['inactive', 'disabled']:
+                                inactive_count += 1
+        
+        return jsonify({
+            'success': True,
+            'active_count': active_count,
+            'inactive_count': inactive_count
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 def run_campaign_background(recipients, from_emails, smtp_servers, html_content, config_settings):
     """Run campaign using campaign_sender module"""
     global campaign_process, campaign_running, campaign_stats, campaign_logs
@@ -982,6 +1012,13 @@ def run_campaign_background(recipients, from_emails, smtp_servers, html_content,
                     'total': event['total'],
                     'used': event['used'],
                     'remaining': event['remaining']
+                })
+                
+            elif event['type'] == 'smtp_status_update':
+                # Send SMTP status update to frontend
+                socketio.emit('smtp_status_update', {
+                    'active': event['active'],
+                    'inactive': event['inactive']
                 })
                 
             elif event['type'] == 'complete':

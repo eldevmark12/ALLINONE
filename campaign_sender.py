@@ -108,6 +108,35 @@ class CampaignSender:
                 'failed': self.total_failed
             })
     
+    def _emit_smtp_status_update(self):
+        """Send SMTP status update via callback"""
+        if self.callback:
+            # Count active vs inactive SMTPs from file
+            active_count = 0
+            inactive_count = 0
+            
+            try:
+                if os.path.exists(self.smtp_file_path):
+                    with open(self.smtp_file_path, 'r') as f:
+                        lines = f.readlines()[1:]  # Skip header
+                        for line in lines:
+                            if line.strip():
+                                parts = line.strip().split(',')
+                                if len(parts) >= 5:
+                                    status = parts[4].strip()
+                                    if status == 'active':
+                                        active_count += 1
+                                    elif status in ['inactive', 'disabled']:
+                                        inactive_count += 1
+            except Exception as e:
+                self.log(f"⚠️ Error reading SMTP status: {str(e)}", 'warning')
+            
+            self.callback({
+                'type': 'smtp_status_update',
+                'active': active_count,
+                'inactive': inactive_count
+            })
+    
     def generate_random_boundary(self):
         """Generate random boundary for email"""
         return ''.join(random.choice(string.digits) for _ in range(36))
@@ -236,6 +265,9 @@ class CampaignSender:
                     self.log(f"⚠️ SMTP {smtp_username} marked INACTIVE after {self.smtp_failures[smtp_username]} failures (persisted to file)", 'warning')
                 else:
                     self.log(f"⚠️ SMTP {smtp_username} marked INACTIVE after {self.smtp_failures[smtp_username]} failures (file update failed)", 'warning')
+                
+                # Emit SMTP status update to frontend
+                self._emit_smtp_status_update()
                 
                 return True
         return False
@@ -433,6 +465,9 @@ class CampaignSender:
         self.log(f"📊 SMTPs: {active_smtp_count} available, {len(self.disabled_smtps)} disabled", 'info')
         self.log(f"🔧 Using {thread_count} threads for parallel sending", 'info')
         self.log(f"📧 Will cycle through {len(recipients)} recipients until all {len(from_emails)} from emails are used", 'info')
+        
+        # Emit initial SMTP status
+        self._emit_smtp_status_update()
         
         # Create task list: pair each from_email with a recipient
         tasks = []
