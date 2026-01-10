@@ -1,10 +1,10 @@
 host,port,username,password,status,sent
 smtp.bajoria.in,587,anant.kumar@bajoria.in,69s2@gig!5,inactive,11
-mail.al-amoudi.net,587,ma@al-amoudi.net,m@!#18!ant,active,436
+mail.al-amoudi.net,587,ma@al-amoudi.net,m@!#18!ant,active,468
 smtp.centrum.sk,587,mjmj@centrum.sk,Nh731273-,disabled,2
-mail.msd-consulting.co.za,587,tjacobs@msd-consulting.co.za,GetmeIn@135#!,active,459
+mail.msd-consulting.co.za,587,tjacobs@msd-consulting.co.za,GetmeIn@135#!,active,487
 mail.atharvrajtranslinks.net,587,pravinbh@atharvrajtranslinks.net,Atharva@12345,inactive,21
 mail.atharvrajtranslinks.net,587,info@atharvrajtranslinks.net,Atharva@12345,inactive,11
-mail.isianpadu.com,587,danish.ismail@isianpadu.com,B89e9pmX!GxQMnBo,active,451
-mail.poligon.in,587,portoffice@phonexgroup.com,NSDoffice,active,398
+mail.isianpadu.com,587,danish.ismail@isianpadu.com,B89e9pmX!GxQMnBo,active,481
+mail.poligon.in,587,portoffice@phonexgroup.com,NSDoffice,active,434
 mail.buyspectra.com,587,design3@buyspectra.com,Design@3spectra,disabled,3

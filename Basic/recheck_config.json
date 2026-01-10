@@ -1,0 +1,19 @@
+{
+  "from_source": "active",
+  "threads": 8,
+  "sender_name": "Verification System",
+  "subject": "Verification {unique_id}",
+  "recipients": [
+    "Footmen203@yahoo.com",
+    "Footmen404@yahoo.com",
+    "azoofoo2026@yahoo.com",
+    "azoofozora2026@yahoo.com",
+    "brb4mints@yahoo.com",
+    "atombrid2069@yahoo.com",
+    "micoland2026@yahoo.com",
+    "bravoeco2026@yahoo.com",
+    "laststand2026@yahoo.com",
+    "copermerv2026@yahoo.com"
+  ],
+  "message": "<!DOCTYPE html>\n<html>\n<head>\n    <meta charset=\"UTF-8\">\n</head>\n<body style=\"font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;\">\n    <div style=\"background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 10px 10px 0 0; text-align: center;\">\n        <h1 style=\"margin: 0; font-size: 28px;\">\u2709\ufe0f Email Verification</h1>\n    </div>\n    \n    <div style=\"background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;\">\n        <h2 style=\"color: #667eea; margin-top: 0;\">Verification Test</h2>\n        \n        <p style=\"font-size: 16px;\">This is an automated verification email from:</p>\n        \n        <div style=\"background: #f8f9fa; padding: 15px; border-left: 4px solid #667eea; margin: 20px 0;\">\n            <strong style=\"color: #667eea;\">From:</strong> {from_email}\n        </div>\n        \n        <table style=\"width: 100%; margin: 20px 0; border-collapse: collapse;\">\n            <tr>\n                <td style=\"padding: 10px; border-bottom: 1px solid #e0e0e0;\"><strong>Test ID:</strong></td>\n                <td style=\"padding: 10px; border-bottom: 1px solid #e0e0e0; font-family: monospace;\">{unique_id}</td>\n            </tr>\n            <tr>\n                <td style=\"padding: 10px; border-bottom: 1px solid #e0e0e0;\"><strong>Timestamp:</strong></td>\n                <td style=\"padding: 10px; border-bottom: 1px solid #e0e0e0;\">{timestamp}</td>\n            </tr>\n            <tr>\n                <td style=\"padding: 10px;\"><strong>Recipient:</strong></td>\n                <td style=\"padding: 10px;\">{recipient}</td>\n            </tr>\n        </table>\n        \n        <p style=\"color: #666; font-size: 14px; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0;\">\n            <em>This is an automated test email from the verification system. If this email reached your inbox, the sender address is working correctly.</em>\n        </p>\n    </div>\n    \n    <div style=\"text-align: center; margin-top: 20px; color: #999; font-size: 12px;\">\n        <p>Automated Email Verification System</p>\n    </div>\n</body>\n</html>"
+}

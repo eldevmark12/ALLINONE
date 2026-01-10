@@ -1994,6 +1994,14 @@ def start_recheck_campaign():
                         'pending_count': event['pending_count'],
                         'failed_count': event['failed_count']
                     })
+                elif event_type == 'recheck_smtp_status':
+                    try:
+                        socketio.emit('recheck_smtp_status', {
+                            'active': event['active'],
+                            'inactive': event['inactive']
+                        })
+                    except:
+                        pass  # Silent fail if no clients connected
             except Exception as e:
                 print(f"[RECHECK CALLBACK ERROR] {e}")
         
@@ -2355,6 +2363,16 @@ def run_recheck_campaign():
         
         emit_log(f'✅ Loaded {len(smtp_servers)} ACTIVE SMTPs from /smtp page', 'success')
         
+        # Emit initial SMTP status counts
+        active_count = len(smtp_servers)
+        inactive_count = 0
+        if recheck_campaign_callback:
+            recheck_campaign_callback({
+                'type': 'recheck_smtp_status',
+                'active': active_count,
+                'inactive': inactive_count
+            })
+        
         # Display available SMTPs
         for i, smtp in enumerate(smtp_servers, 1):
             smtp_name = smtp.get('username', smtp['host']).split('@')[0]
@@ -2445,6 +2463,16 @@ def run_recheck_campaign():
                             if updated:
                                 with open(smtp_file, 'w') as f:
                                     f.writelines(lines)
+                                
+                                # Update SMTP status counts
+                                active_count = sum(1 for s in smtp_servers if s.get('failures', 0) < 5 and s.get('auth_failures', 0) < 3)
+                                inactive_count = len(smtp_servers) - active_count
+                                if recheck_campaign_callback:
+                                    recheck_campaign_callback({
+                                        'type': 'recheck_smtp_status',
+                                        'active': active_count,
+                                        'inactive': inactive_count
+                                    })
                     
                     with count_lock:
                         if success:
@@ -2473,6 +2501,16 @@ def run_recheck_campaign():
         
         # Report SMTP statuses
         inactive_smtps = [s for s in smtp_servers if s.get('failures', 0) >= 5 or s.get('auth_failures', 0) >= 3]
+        active_smtps = [s for s in smtp_servers if s.get('failures', 0) < 5 and s.get('auth_failures', 0) < 3]
+        
+        # Send final SMTP status
+        if recheck_campaign_callback:
+            recheck_campaign_callback({
+                'type': 'recheck_smtp_status',
+                'active': len(active_smtps),
+                'inactive': len(inactive_smtps)
+            })
+        
         if inactive_smtps:
             emit_log(f'⚠️ {len(inactive_smtps)} SMTP(s) marked as INACTIVE due to failures:', 'warning')
             for smtp in inactive_smtps:
