@@ -75,16 +75,19 @@ class CampaignSender:
                 for line in lines[1:]:
                     if line.strip():
                         parts = line.strip().split(',')
-                        if len(parts) >= 4:
+                        if len(parts) >= 3:  # Minimum: host, port, username
                             current_username = parts[2].strip()
                             if current_username == smtp_username:
-                                # Update this SMTP's status
-                                sent = parts[5].strip() if len(parts) > 5 else '0'
-                                f.write(f"{parts[0]},{parts[1]},{parts[2]},{parts[3]},{new_status},{sent}\n")
+                                # Update this SMTP's status (safely handle missing fields)
+                                host = parts[0] if len(parts) > 0 else ''
+                                port = parts[1] if len(parts) > 1 else ''
+                                password = parts[3] if len(parts) > 3 else ''
+                                sent = parts[5] if len(parts) > 5 else '0'
+                                f.write(f"{host},{port},{current_username},{password},{new_status},{sent}\n")
                                 updated = True
                             else:
                                 # Keep other SMTPs unchanged
-                                f.write(line)
+                                f.write(line if line.endswith('\n') else line + '\n')
             
             return updated
         except Exception as e:
@@ -141,19 +144,31 @@ class CampaignSender:
     def get_next_smtp(self, smtp_servers=None):
         """Get next active SMTP server from thread-safe queue
         
+        Filters out disabled SMTPs that may still be in queue from before they were disabled.
+        
         Args:
             smtp_servers: Optional list of SMTP servers (used only for initialization)
         
         Returns:
             SMTP server dict or None if queue is empty
         """
-        try:
-            # Try to get SMTP from queue (non-blocking)
-            smtp = self.smtp_queue.get_nowait()
-            return smtp
-        except Empty:
-            # Queue is empty, no SMTPs available
-            return None
+        max_attempts = 100  # Prevent infinite loop if all queued SMTPs are disabled
+        for _ in range(max_attempts):
+            try:
+                # Try to get SMTP from queue (non-blocking)
+                smtp = self.smtp_queue.get_nowait()
+                
+                # Check if this SMTP was disabled since it was added to queue
+                if smtp['username'] not in self.disabled_smtps:
+                    return smtp
+                # else: skip this disabled SMTP and try next one
+                
+            except Empty:
+                # Queue is empty, no SMTPs available
+                return None
+        
+        # If we tried 100 times and all were disabled, queue is exhausted
+        return None
     
     def _initialize_smtp_queue(self, smtp_servers):
         """Initialize SMTP queue with active, non-disabled SMTPs
@@ -200,12 +215,17 @@ class CampaignSender:
         When an SMTP reaches the failure threshold:
         1. Add to in-memory disabled set
         2. Update status to 'inactive' in smtp.txt file
-        3. Log the marking event
+        3. Log the marking event (ONCE)
         """
         with self.smtp_lock:
+            # Skip if already disabled (prevents duplicate marking messages)
+            if smtp_username in self.disabled_smtps:
+                return False
+            
             self.smtp_failures[smtp_username] = self.smtp_failures.get(smtp_username, 0) + 1
             
-            if self.smtp_failures[smtp_username] >= self.max_smtp_failures:
+            # Only mark inactive on FIRST time hitting threshold
+            if self.smtp_failures[smtp_username] == self.max_smtp_failures:
                 # Add to disabled set (in-memory)
                 self.disabled_smtps.add(smtp_username)
                 
