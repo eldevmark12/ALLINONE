@@ -898,8 +898,11 @@ def start_campaign():
             target=run_campaign_background,
             args=(recipients, from_emails, smtp_servers, html_content, config['Settings'])
         )
-        thread.daemon = False  # Allow campaign to continue running after browser closes
+        thread.daemon = False  # CRITICAL: False = Campaign continues running even if browser closed for days
         thread.start()
+        
+        # Log to server console (visible even if browser closed)
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Campaign started - Will run independently in background (browser can be closed)")
         
         return jsonify({'success': True, 'message': f'Campaign started: {len(recipients)} recipients, {len(active_smtps)} active SMTPs'})
     except Exception as e:
@@ -998,35 +1001,51 @@ def run_campaign_background(recipients, from_emails, smtp_servers, html_content,
                     campaign_logs.append(log_entry)
                     if len(campaign_logs) > 1000:  # Keep last 1000 logs
                         del campaign_logs[:-1000]
-                socketio.emit('campaign_log', {'message': event['message'], 'type': event['log_type']})
+                # Emit to connected clients (silent fail if no clients - campaign continues)
+                try:
+                    socketio.emit('campaign_log', {'message': event['message'], 'type': event['log_type']})
+                except:
+                    pass  # Campaign continues even if no browser connected
                 
             elif event['type'] == 'stats':
                 with campaign_lock:
                     campaign_stats['total_sent'] = event['sent']
                     campaign_stats['total_failed'] = event['failed']
-                socketio.emit('campaign_stats', {'sent': event['sent'], 'failed': event['failed']})
+                try:
+                    socketio.emit('campaign_stats', {'sent': event['sent'], 'failed': event['failed']})
+                except:
+                    pass
                 
             elif event['type'] == 'from_count_update':
                 # Update from email count in real-time
-                socketio.emit('from_count_update', {
-                    'total': event['total'],
-                    'used': event['used'],
-                    'remaining': event['remaining']
-                })
+                try:
+                    socketio.emit('from_count_update', {
+                        'total': event['total'],
+                        'used': event['used'],
+                        'remaining': event['remaining']
+                    })
+                except:
+                    pass
                 
             elif event['type'] == 'smtp_status_update':
                 # Send SMTP status update to frontend
-                socketio.emit('smtp_status_update', {
-                    'active': event['active'],
-                    'inactive': event['inactive']
-                })
+                try:
+                    socketio.emit('smtp_status_update', {
+                        'active': event['active'],
+                        'inactive': event['inactive']
+                    })
+                except:
+                    pass
                 
             elif event['type'] == 'complete':
                 # Update SMTP sent counts in smtp.txt
                 update_smtp_sent_counts(event.get('smtp_stats', {}))
                 with campaign_lock:
                     campaign_stats['status'] = 'completed'
-                socketio.emit('campaign_complete', {'sent': event['sent'], 'failed': event['failed']})
+                try:
+                    socketio.emit('campaign_complete', {'sent': event['sent'], 'failed': event['failed']})
+                except:
+                    pass
         
         # Create campaign sender instance with from file path
         from_file_path = os.path.join(BASIC_FOLDER, 'from.txt')
@@ -1048,10 +1067,15 @@ def run_campaign_background(recipients, from_emails, smtp_servers, html_content,
         with campaign_lock:
             campaign_logs.append({'time': datetime.now().strftime('%H:%M:%S'), 'message': error_msg, 'type': 'error'})
             campaign_stats['status'] = 'error'
-        socketio.emit('campaign_log', {'message': error_msg, 'type': 'error'})
+        try:
+            socketio.emit('campaign_log', {'message': error_msg, 'type': 'error'})
+        except:
+            pass
     finally:
         with campaign_lock:
             campaign_running = False
+            # Log completion to server logs (visible even if browser closed)
+            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Campaign finished - Sent: {campaign_stats.get('total_sent', 0)}, Failed: {campaign_stats.get('total_failed', 0)}")
         campaign_process = None
 
 def update_smtp_sent_counts(smtp_stats):
@@ -1626,21 +1650,30 @@ def start_sending_campaign():
                 event_type = event.get('type')
                 print(f"[CALLBACK] Type: {event_type}, Message: {event.get('message', 'N/A')}")
                 if event_type == 'sending_campaign_log':
-                    socketio.emit('sending_campaign_log', {
-                        'message': event['message'],
-                        'log_type': event.get('log_type', 'info')
-                    })
-                    print(f"[CALLBACK] Emitted sending_campaign_log")
+                    try:
+                        socketio.emit('sending_campaign_log', {
+                            'message': event['message'],
+                            'log_type': event.get('log_type', 'info')
+                        })
+                        print(f"[CALLBACK] Emitted sending_campaign_log")
+                    except:
+                        pass
                 elif event_type == 'sending_campaign_stats':
-                    socketio.emit('sending_campaign_stats', {
-                        'sent': event['sent']
-                    })
-                    print(f"[CALLBACK] Emitted sending_campaign_stats: {event['sent']}")
+                    try:
+                        socketio.emit('sending_campaign_stats', {
+                            'sent': event['sent']
+                        })
+                        print(f"[CALLBACK] Emitted sending_campaign_stats: {event['sent']}")
+                    except:
+                        pass
                 elif event_type == 'sending_campaign_complete':
-                    socketio.emit('sending_campaign_complete', {
-                        'message': event['message']
-                    })
-                    print(f"[CALLBACK] Emitted sending_campaign_complete")
+                    try:
+                        socketio.emit('sending_campaign_complete', {
+                            'message': event['message']
+                        })
+                        print(f"[CALLBACK] Emitted sending_campaign_complete")
+                    except:
+                        pass
             except Exception as e:
                 print(f"[CALLBACK ERROR] {e}")
                 import traceback
@@ -1654,6 +1687,9 @@ def start_sending_campaign():
         sending_campaign_running = True
         sending_campaign_thread = threading.Thread(target=run_sending_campaign, daemon=False)
         sending_campaign_thread.start()
+        
+        # Log to server console
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Sending campaign started - Runs independently in background")
         
         return jsonify({'success': True})
     except Exception as e:
@@ -1993,6 +2029,7 @@ def start_recheck_campaign():
         recheck_campaign_thread = threading.Thread(target=run_recheck_campaign, daemon=False)
         recheck_campaign_thread.start()
         
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Recheck campaign started - Runs independently in background")
         print("🎉 Campaign thread started successfully")
         
         return jsonify({
