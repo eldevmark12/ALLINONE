@@ -27,6 +27,7 @@ class CampaignSender:
         self.disabled_smtps = set()  # Track disabled SMTPs (in memory)
         self.smtp_lock = threading.Lock()
         self.smtp_queue = Queue()  # Thread-safe SMTP distribution queue
+        self.queue_refilling = False  # Flag to prevent multiple threads from refilling simultaneously
         self.from_index = 0
         self.recipient_index = 0
         self.from_file_path = from_file_path
@@ -316,11 +317,73 @@ class CampaignSender:
             self.log(error_msg, 'error')
             return False
     
+    def _send_email_with_smtp_fetch(self, recipient, from_email, smtp_servers, html_content, subject, sender_name):
+        """Wrapper that fetches SMTP from queue before sending
+        
+        Key improvements:
+        - Race condition prevention: Only one thread refills at a time
+        - Smart refill: Only refills if queue is genuinely empty
+        - SMTP recycling: Returns SMTP to queue after use (unless it failed)
+        - Proper multiplier: Uses * 100 for large campaigns
+        """
+        smtp_server = None
+        max_retries = 3
+        
+        for attempt in range(max_retries):
+            smtp_server = self.get_next_smtp()
+            if smtp_server:
+                break
+            
+            # Queue empty, need to refill
+            # Use lock and flag to ensure only ONE thread refills at a time
+            with self.smtp_lock:
+                # Check if queue is STILL empty (another thread might have refilled)
+                if self.smtp_queue.qsize() > 0:
+                    continue  # Queue was refilled by another thread, retry get
+                
+                # Check if another thread is already refilling
+                if self.queue_refilling:
+                    pass  # Wait for the other thread to finish refilling
+                else:
+                    # This thread will do the refill
+                    self.queue_refilling = True
+                    
+                    remaining_smtps = [s for s in smtp_servers if s.get('status') == 'active' and s['username'] not in self.disabled_smtps]
+                    if remaining_smtps:
+                        # Log ONCE per actual refill event
+                        self.log(f"🔄 Refilling SMTP queue with {len(remaining_smtps)} active SMTPs", 'info')
+                        # Use * 100 like initialization (not * 10)
+                        for smtp in remaining_smtps * 100:
+                            self.smtp_queue.put(smtp)
+                    else:
+                        self.queue_refilling = False
+                        self.log("❌ No active SMTP servers available", 'error')
+                        return False
+                    
+                    self.queue_refilling = False
+            
+            time.sleep(0.1)  # Brief pause before retry
+        
+        if not smtp_server:
+            self.log(f"✗ FAILED {recipient} | No SMTP available after retries", 'error')
+            self.total_failed += 1
+            return False
+        
+        # Send the email
+        success = self.send_email(recipient, from_email, smtp_server, html_content, subject, sender_name)
+        
+        # CRITICAL: Return SMTP to queue for reuse (unless it was marked inactive)
+        if smtp_server['username'] not in self.disabled_smtps:
+            self.smtp_queue.put(smtp_server)
+        
+        return success
+    
     def send_campaign(self, recipients, from_emails, smtp_servers, html_content, subject, sender_name):
         """Send campaign to all from emails by cycling through recipients with multi-threading
         
         Key improvements:
         - Thread-safe SMTP distribution using queue
+        - Worker threads fetch their own SMTP (no pre-assignment)
         - Persistent SMTP disabling to smtp.txt
         - Better error handling and logging
         - Controlled thread pool size
@@ -342,6 +405,10 @@ class CampaignSender:
         
         active_smtp_count = len([s for s in smtp_servers if s.get('status') == 'active' and s['username'] not in self.disabled_smtps])
         
+        if active_smtp_count == 0:
+            self.log("❌ No active SMTP servers available - cannot start campaign", 'error')
+            return
+        
         self.log(f"🚀 Starting campaign: {len(recipients)} recipients, {len(from_emails)} from emails", 'info')
         self.log(f"📊 SMTPs: {active_smtp_count} available, {len(self.disabled_smtps)} disabled", 'info')
         self.log(f"🔧 Using {thread_count} threads for parallel sending", 'info')
@@ -360,6 +427,7 @@ class CampaignSender:
         self.log(f"📋 Created {len(tasks)} sending tasks", 'info')
         
         # Execute tasks with thread pool
+        # Each worker thread will fetch its own SMTP from the queue
         with ThreadPoolExecutor(max_workers=thread_count) as executor:
             futures = {}
             
@@ -367,34 +435,18 @@ class CampaignSender:
                 if not self.running:
                     break
                 
-                # Get next SMTP from queue (thread-safe)
-                smtp_server = self.get_next_smtp()
-                if not smtp_server:
-                    self.log("⚠️ No SMTP servers available in queue", 'warning')
-                    # Try to refill queue with remaining ACTIVE SMTPs only
-                    remaining_smtps = [s for s in smtp_servers if s.get('status') == 'active' and s['username'] not in self.disabled_smtps]
-                    if remaining_smtps:
-                        self.log(f"🔄 Refilling SMTP queue with {len(remaining_smtps)} active SMTPs", 'info')
-                        for smtp in remaining_smtps * 10:  # Add each SMTP 10 times
-                            self.smtp_queue.put(smtp)
-                        smtp_server = self.get_next_smtp()
-                    
-                    if not smtp_server:
-                        self.log("❌ No active SMTP servers available - STOPPING CAMPAIGN", 'error')
-                        self.running = False
-                        break
-                
-                # Submit task
+                # Submit task WITHOUT pre-assigning SMTP
+                # The worker thread will fetch SMTP from queue when ready
                 future = executor.submit(
-                    self.send_email, 
+                    self._send_email_with_smtp_fetch,
                     recipient, 
-                    from_email, 
-                    smtp_server, 
+                    from_email,
+                    smtp_servers,  # Pass smtp_servers for refill logic
                     html_content, 
                     subject, 
                     sender_name
                 )
-                futures[future] = (from_email, recipient, smtp_server)
+                futures[future] = (from_email, recipient)
             
             # Process completed tasks
             for future in as_completed(futures):
@@ -403,7 +455,7 @@ class CampaignSender:
                     executor.shutdown(wait=False, cancel_futures=True)
                     break
                 
-                from_email, recipient, smtp_server = futures[future]
+                from_email, recipient = futures[future]
                 
                 try:
                     success = future.result()
